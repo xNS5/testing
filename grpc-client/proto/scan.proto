@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package infodump_temporal;
+
+option go_package = ".";
+
+service ScanImage {
+  rpc ScanImage(ScanImageRequest) returns (ScanOutput) {}
+}
+
+message ScanImageRequest {
+  string id = 1;
+  string user = 2;
+  bytes image = 3;
+}
+
+message ScanInput {
+  string bucket = 1;
+  string fileName = 2;
+  string fullFileName = 3;
+  string outPath = 4;
+  string fileExt = 5;
+  string fileMimeType = 6;
+  int64 fileSize = 7;
+}
+
+message ScanOutput {
+  int64 status = 1;
+  string description = 2;
+  ScanInput uploadInfo = 3;
+}
