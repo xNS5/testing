@@ -15,7 +15,10 @@ type HelloServer struct {
 }
 
 func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Response, error) {
-	time.Sleep(2 * time.Second)
+	if foo.Timeout != nil && *foo.Timeout > 0 {
+		time.Sleep(time.Duration(*foo.Timeout) * time.Second)
+	}
+
 	return &hello.Response{
 		Res: "Hello, world!",
 	}, nil
