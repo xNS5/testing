@@ -15,13 +15,14 @@ type HelloServer struct {
 }
 
 func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Response, error) {
-	time.Sleep(10 * time.Second)
+	time.Sleep(2 * time.Second)
 	return &hello.Response{
 		Res: "Hello, world!",
 	}, nil
 }
 
 func main() {
+
 	fmt.Println("Initializing gRPC Server")
 	serverAddr := fmt.Sprintf("localhost:%d", 5050)
 	listen, err := net.Listen("tcp", serverAddr)
