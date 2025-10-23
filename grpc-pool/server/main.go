@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	logging "grpc-server/middleware/logging"
 	hello "grpc-server/protobuf"
 	"net"
 	"time"
@@ -30,12 +31,18 @@ func main() {
 	serverAddr := fmt.Sprintf("localhost:%d", 5050)
 	listen, err := net.Listen("tcp", serverAddr)
 
+	logging.Init()
+
 	if err != nil {
 		fmt.Printf("Error starting server")
 		return
 	}
 
-	var opts []grpc.ServerOption
+	opts := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(
+			logging.UnaryLoggingInterceptor(logging.Logger),
+		),
+	}
 
 	server := grpc.NewServer(opts...)
 

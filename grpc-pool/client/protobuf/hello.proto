@@ -8,7 +8,9 @@ service Hello {
   rpc Hello(Request) returns (Response) {}
 }
 
-message Request {}
+message Request {
+  optional int32 timeout = 1;
+}
 
 message Response {
     string res = 1;

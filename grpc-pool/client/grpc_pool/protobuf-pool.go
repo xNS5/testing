@@ -47,6 +47,7 @@ func NewPool(pool *Pool) (*Pool, error) {
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
+	fmt.Println("Locking Mutex")
 	p.Mtx.Lock()
 
 	defer p.Mtx.Unlock()
@@ -55,6 +56,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	for _, c := range p.Conns {
 		if c.canAccept(p.MaxPerConn) {
+			fmt.Println("Found best connection", c.ID)
 			best = c
 			c.touch()
 			break
@@ -69,9 +71,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		}
 		best = conn
 		p.Conns = append(p.Conns, best)
-	}
-
-	if best == nil {
+	} else {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
 	best.active.Add(1)

@@ -23,6 +23,7 @@ const (
 
 type Request struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timeout       *int32                 `protobuf:"varint,1,opt,name=timeout,proto3,oneof" json:"timeout,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -55,6 +56,13 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Request.ProtoReflect.Descriptor instead.
 func (*Request) Descriptor() ([]byte, []int) {
 	return file_hello_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Request) GetTimeout() int32 {
+	if x != nil && x.Timeout != nil {
+		return *x.Timeout
+	}
+	return 0
 }
 
 type Response struct {
@@ -105,8 +113,11 @@ var File_hello_proto protoreflect.FileDescriptor
 
 const file_hello_proto_rawDesc = "" +
 	"\n" +
-	"\vhello.proto\x12\x05hello\"\t\n" +
-	"\aRequest\"\x1c\n" +
+	"\vhello.proto\x12\x05hello\"4\n" +
+	"\aRequest\x12\x1d\n" +
+	"\atimeout\x18\x01 \x01(\x05H\x00R\atimeout\x88\x01\x01B\n" +
+	"\n" +
+	"\b_timeout\"\x1c\n" +
 	"\bResponse\x12\x10\n" +
 	"\x03res\x18\x01 \x01(\tR\x03res23\n" +
 	"\x05Hello\x12*\n" +
@@ -144,6 +155,7 @@ func file_hello_proto_init() {
 	if File_hello_proto != nil {
 		return
 	}
+	file_hello_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
