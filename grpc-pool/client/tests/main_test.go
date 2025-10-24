@@ -17,6 +17,8 @@ func TestConnection(t *testing.T) {
 
 	pool, err := GetPool()
 
+	fmt.Println(pool.Target, pool.MaxConns, pool.MaxPerConn)
+
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
 		os.Exit(-1)
@@ -44,6 +46,8 @@ func TestConnection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	defer cancel()
+
+	defer pool.Release(conn)
 
 	res, err := client.Hello(ctx, &proto.Request{})
 
