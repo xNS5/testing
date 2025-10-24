@@ -26,15 +26,16 @@ func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Res
 }
 
 func main() {
+	
+	logging.Init()
 
-	fmt.Println("Initializing gRPC Server")
+	logging.Logger.Info().Msg("Initializing gRPC Server")
 	serverAddr := fmt.Sprintf("localhost:%d", 5050)
 	listen, err := net.Listen("tcp", serverAddr)
 
-	logging.Init()
 
 	if err != nil {
-		fmt.Printf("Error starting server")
+		logging.Logger.Error().Err(err).Msg("Error starting server")
 		return
 	}
 
@@ -48,10 +49,10 @@ func main() {
 
 	hello.RegisterHelloServer(server, &HelloServer{})
 
-	fmt.Printf("Serving gRPC server on %v\r\n", serverAddr)
+	logging.Logger.Info().Msgf("Serving gRPC server on %v\r\n", serverAddr)
 
 	if err := server.Serve(listen); err != nil {
-		fmt.Printf("Error serving gRPC server")
+		logging.Logger.Error().Err(err).Msg("Error serving gRPC server")
 	}
 
 }

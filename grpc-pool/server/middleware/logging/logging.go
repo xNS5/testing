@@ -50,19 +50,26 @@ func UnaryLoggingInterceptor(logger zerolog.Logger) grpc.UnaryServerInterceptor 
 			}
 		}
 
+		var evt *zerolog.Event
+
 		resp, err = handler(ctx, req)
 
-		evt := logger.Info().
+		if err != nil {
+			evt = logger.Error()
+		} else {
+			evt = logger.Info()
+		}
+
+		evt.
 			Str("grpc_method", info.FullMethod).
 			Str("remote_ip", remoteIP).
 			Str("user_agent", userAgent).
-			Dur("duration_ms", time.Since(start)).
-			Bool("error", err != nil)
+			Dur("duration_ms", time.Since(start))
 
 		if err != nil {
-			evt.Err(err).Msg("gRPC request failed")
+			evt.Err(err).Msg("gRPC Request Failed")
 		} else {
-			evt.Msg("gRPC request completed")
+			evt.Msg("gRPC Request Completed")
 		}
 
 		return resp, err

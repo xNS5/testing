@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -24,7 +25,9 @@ type Pool struct {
 func NewClient(target string, opts []grpc.DialOption) (*Conn, error) {
 	conn, err := grpc.NewClient(target, opts...)
 
-	return &Conn{ClientConn: conn}, err
+	return &Conn{
+		ID: uuid.New(),
+		ClientConn: conn}, err
 }
 
 func NewPool(pool *Pool) (*Pool, error) {
@@ -43,6 +46,7 @@ func NewPool(pool *Pool) (*Pool, error) {
 		Target:   pool.Target,
 		Opts:     pool.Opts,
 		MaxConns: pool.MaxConns,
+		MaxPerConn: pool.MaxPerConn,
 	}, nil
 }
 
@@ -63,14 +67,18 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		}
 	}
 
-	if best == nil && len(p.Conns) < p.MaxConns {
-		conn, err := NewClient(p.Target, p.Opts)
+	if len(p.Conns) < p.MaxConns {
 
-		if err != nil {
-			return nil, err
-		}
-		best = conn
-		p.Conns = append(p.Conns, best)
+		if best == nil  {
+			conn, err := NewClient(p.Target, p.Opts)
+
+			if err != nil {
+				return nil, err
+			}
+			best = conn
+			p.Conns = append(p.Conns, best)
+		} 
+		
 	} else {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
@@ -82,6 +90,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 func (p *Pool) Release(c *Conn) {
 	p.Mtx.Lock()
 	defer p.Mtx.Unlock()
+	defer p.Clean()
 	c.active.Add(-1)
 }
 
