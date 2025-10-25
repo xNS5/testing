@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Pool struct {
@@ -50,6 +52,20 @@ func NewPool(pool *Pool) (*Pool, error) {
 		MaxConns:   pool.MaxConns,
 		MaxPerConn: pool.MaxPerConn,
 	}, nil
+}
+
+// TODO: Implement Invoke function
+func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
+	return nil
+}
+
+func (p *Pool) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return nil, status.Error(codes.Unimplemented, "streaming not supported")
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
