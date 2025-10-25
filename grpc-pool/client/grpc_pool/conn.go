@@ -1,6 +1,7 @@
 package grpc_pool
 
 import (
+	"fmt"
 	"grpc_client/grpc_pool/states"
 	"sync/atomic"
 	"time"
@@ -43,10 +44,12 @@ func (c *Conn) canAccept(maxRPC int) bool {
 	return c.active.Load() < int32(maxRPC)
 }
 
-func (c *Conn) safeClose() {
+func (c *Conn) safeClose() error {
+
 	if !c.state.CompareAndSwap(states.IDLE, states.CLOSING) && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) {
-		return
+		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
 	}
 	_ = c.ClientConn.Close()
-	c.state.Store(int32(states.CLOSED))
+	c.state.Store(states.CLOSED)
+	return nil
 }

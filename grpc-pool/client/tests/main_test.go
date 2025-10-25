@@ -6,7 +6,6 @@ import (
 	proto "grpc_client/protobuf"
 	"os"
 	"testing"
-	"time"
 )
 
 var MODE = 1 // 1 debug 0...not debug?
@@ -33,19 +32,11 @@ func TestConnection(t *testing.T) {
 		os.Exit(-1)
 	}
 
-	defer conn.Close()
-
 	if MODE == 1 {
 		fmt.Println("Conn Success")
 	}
 
 	client := proto.NewHelloClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	defer cancel()
-
-	defer pool.Release(conn)
 
 	res, err := client.Hello(ctx, &proto.Request{})
 
@@ -89,11 +80,6 @@ func TestTimeout(t *testing.T) {
 	}
 
 	client := proto.NewHelloClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	defer cancel()
-	defer pool.Release(conn)
 
 	res, err := client.Hello(ctx, &proto.Request{})
 

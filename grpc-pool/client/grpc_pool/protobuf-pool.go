@@ -26,8 +26,9 @@ func NewClient(target string, opts []grpc.DialOption) (*Conn, error) {
 	conn, err := grpc.NewClient(target, opts...)
 
 	return &Conn{
-		ID: uuid.New(),
-		ClientConn: conn}, err
+		ID:         uuid.New(),
+		ClientConn: conn,
+	}, err
 }
 
 func NewPool(pool *Pool) (*Pool, error) {
@@ -42,10 +43,11 @@ func NewPool(pool *Pool) (*Pool, error) {
 	}
 
 	return &Pool{
-		Conns:    []*Conn{conn},
-		Target:   pool.Target,
-		Opts:     pool.Opts,
-		MaxConns: pool.MaxConns,
+		Conns:      []*Conn{conn},
+		Target:     pool.Target,
+		Opts:       pool.Opts,
+		Timeout:    pool.Timeout,
+		MaxConns:   pool.MaxConns,
 		MaxPerConn: pool.MaxPerConn,
 	}, nil
 }
@@ -69,7 +71,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	if len(p.Conns) < p.MaxConns {
 
-		if best == nil  {
+		if best == nil {
 			conn, err := NewClient(p.Target, p.Opts)
 
 			if err != nil {
@@ -77,11 +79,12 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 			}
 			best = conn
 			p.Conns = append(p.Conns, best)
-		} 
-		
+		}
+
 	} else {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
+
 	best.active.Add(1)
 
 	return best, nil
@@ -90,19 +93,34 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 func (p *Pool) Release(c *Conn) {
 	p.Mtx.Lock()
 	defer p.Mtx.Unlock()
-	defer p.Clean()
-	c.active.Add(-1)
+
+	if c.active.Load() > 0 {
+		c.active.Add(-1)
+	}
+
+	if c.active.Load() == 0 {
+		c.state.Swap(states.IDLE)
+	}
 }
 
-func (p *Pool) DoUnary(ctx context.Context, f func(conn *grpc.ClientConn) error) error {
+func (p *Pool) LifecycleInterceptor(ctx context.Context,
+	method string,
+	req any,
+	reply any,
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
 
 	conn, err := p.Get(ctx)
+
 	if err != nil {
 		return err
 	}
+
 	defer p.Release(conn)
 
-	return f(conn.ClientConn)
+	return invoker(ctx, method, req, reply, cc, opts...)
 }
 
 func (p *Pool) Clean() {
@@ -125,6 +143,8 @@ func (p *Pool) Clean() {
 	p.Mtx.Unlock()
 
 	for _, c := range to_close {
-		c.safeClose()
+		if err := c.safeClose(); err != nil {
+			fmt.Printf("Unable to safe close: %v", err)
+		}
 	}
 }
