@@ -22,7 +22,6 @@ func GetPool() (*grpc_pool.Pool, error) {
 		Timeout: time.Duration(20 * time.Second),
 		Opts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(Pool.LifecycleInterceptor),
 		},
 		MaxConns:   2,
 		MaxPerConn: 5,

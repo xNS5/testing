@@ -54,20 +54,6 @@ func NewPool(pool *Pool) (*Pool, error) {
 	}, nil
 }
 
-// TODO: Implement Invoke function
-func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-	return nil
-}
-
-func (p *Pool) NewStream(
-	ctx context.Context,
-	desc *grpc.StreamDesc,
-	method string,
-	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	return nil, status.Error(codes.Unimplemented, "streaming not supported")
-}
-
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	fmt.Println("Locking Mutex")
 	p.Mtx.Lock()
@@ -119,26 +105,6 @@ func (p *Pool) Release(c *Conn) {
 	}
 }
 
-func (p *Pool) LifecycleInterceptor(ctx context.Context,
-	method string,
-	req any,
-	reply any,
-	cc *grpc.ClientConn,
-	invoker grpc.UnaryInvoker,
-	opts ...grpc.CallOption,
-) error {
-
-	conn, err := p.Get(ctx)
-
-	if err != nil {
-		return err
-	}
-
-	defer p.Release(conn)
-
-	return invoker(ctx, method, req, reply, cc, opts...)
-}
-
 func (p *Pool) Clean() {
 	p.Mtx.Lock()
 
@@ -163,4 +129,44 @@ func (p *Pool) Clean() {
 			fmt.Printf("Unable to safe close: %v", err)
 		}
 	}
+}
+
+/*
+CONNECTION LIFECYCLE
+*/
+func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
+	conn, err := p.Get(ctx)
+
+	if err != nil {
+		return fmt.Errorf("error invoking connection, %v", err)
+	}
+
+	defer p.Release(conn)
+
+	return nil
+}
+
+func (p *Pool) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return nil, status.Error(codes.Unimplemented, "streaming not supported")
+}
+
+/*
+INTERCEPTORS
+*/
+
+func (p *Pool) LoggingInterceptor(ctx context.Context,
+	method string,
+	req any,
+	reply any,
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+
+	return invoker(ctx, method, req, reply, cc, opts...)
 }
