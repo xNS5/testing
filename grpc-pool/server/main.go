@@ -17,6 +17,7 @@ type HelloServer struct {
 
 func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Response, error) {
 	if foo.Timeout != nil && *foo.Timeout > 0 {
+		logging.Logger.Debug().Msgf("Sleeping for %v seconds", *foo.Timeout)
 		time.Sleep(time.Duration(*foo.Timeout) * time.Second)
 	}
 

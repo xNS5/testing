@@ -2,13 +2,10 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	proto "grpc_client/protobuf"
 	"os"
 	"testing"
 )
-
-var MODE = 1 // 1 debug 0...not debug?
 
 func TestConnection(t *testing.T) {
 
@@ -21,19 +18,11 @@ func TestConnection(t *testing.T) {
 		os.Exit(-1)
 	}
 
-	if MODE == 1 {
-		fmt.Println("Getting conn")
-	}
-
 	conn, err := pool.Get(ctx)
 
 	if err != nil {
 		t.Errorf("Error getting connection: %v", err)
 		os.Exit(-1)
-	}
-
-	if MODE == 1 {
-		fmt.Println("Conn Success")
 	}
 
 	client := proto.NewHelloClient(conn)
@@ -62,10 +51,6 @@ func TestTimeout(t *testing.T) {
 		os.Exit(-1)
 	}
 
-	if MODE == 1 {
-		fmt.Println("Getting conn")
-	}
-
 	conn, err := pool.Get(ctx)
 
 	if err != nil {
@@ -75,13 +60,13 @@ func TestTimeout(t *testing.T) {
 
 	defer conn.Close()
 
-	if MODE == 1 {
-		fmt.Println("Conn Success")
-	}
-
 	client := proto.NewHelloClient(conn)
 
-	res, err := client.Hello(ctx, &proto.Request{})
+	timeout := int32(10)
+
+	res, err := client.Hello(ctx, &proto.Request{
+		Timeout: &timeout,
+	})
 
 	if err != nil {
 		t.Errorf("hello request error: %v", err)
