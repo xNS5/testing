@@ -18,25 +18,27 @@ type Pool struct {
 	Target     string
 	Opts       []grpc.DialOption
 	Timeout    time.Duration
+	RPCTimeout time.Duration
 	MaxConns   int
 	MaxPerConn int
 }
 
-func NewClient(target string, opts []grpc.DialOption) (*Conn, error) {
-	conn, err := grpc.NewClient(target, opts...)
+func NewClient(pool *Pool) (*Conn, error) {
+	conn, err := grpc.NewClient(pool.Target, pool.Opts...)
 
 	return &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
+		timeout:    pool.RPCTimeout,
 	}, err
 }
 
 func NewPool(pool *Pool) (*Pool, error) {
 	if pool.MaxConns <= 0 {
-		return nil, fmt.Errorf("MaxConns must be greater than zero")
+		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
-	conn, err := NewClient(pool.Target, pool.Opts)
+	conn, err := NewClient(pool)
 
 	if err != nil {
 		return nil, err
@@ -67,7 +69,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	if len(p.Conns) < p.MaxConns {
 
 		if best == nil {
-			conn, err := NewClient(p.Target, p.Opts)
+			conn, err := NewClient(p)
 
 			if err != nil {
 				return nil, err

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	cancellationhandler "grpc-server/middleware/cancellation-handler"
 	logging "grpc-server/middleware/logging"
 	hello "grpc-server/protobuf"
 	"net"
@@ -18,7 +19,9 @@ type HelloServer struct {
 func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Response, error) {
 	if foo.Timeout != nil && *foo.Timeout > 0 {
 		logging.Logger.Debug().Msgf("Sleeping for %v seconds", *foo.Timeout)
-		time.Sleep(time.Duration(*foo.Timeout) * time.Second)
+		for range *foo.Timeout {
+			time.Sleep(1 * time.Second)
+		}
 	}
 
 	return &hello.Response{
@@ -44,6 +47,7 @@ func main() {
 	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			logging.UnaryLoggingInterceptor(log),
+			cancellationhandler.UnaryCancellationInterceptor(),
 		),
 	}
 
@@ -56,5 +60,4 @@ func main() {
 	if err := server.Serve(listen); err != nil {
 		log.Error().Err(err).Msg("Error serving gRPC server")
 	}
-
 }

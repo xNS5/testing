@@ -15,6 +15,7 @@ type Conn struct {
 	*grpc.ClientConn
 	PoolRef  *Pool
 	ID       uuid.UUID
+	timeout  time.Duration
 	active   atomic.Int32
 	state    atomic.Int32
 	lastUsed atomic.Int64
@@ -26,15 +27,19 @@ const idleThreshold = time.Duration(30 * time.Second)
 CONNECTION LIFECYCLE
 */
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-
-	defer cancel()
 
 	pool := c.PoolRef
 
 	if pool == nil {
 		return fmt.Errorf("pool is nil")
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
 
 	defer pool.Release(c)
 

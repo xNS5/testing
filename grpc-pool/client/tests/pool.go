@@ -18,8 +18,9 @@ func GetPool() (*grpc_pool.Pool, error) {
 	}
 
 	poolConfig := &grpc_pool.Pool{
-		Target:  "localhost:5050",
-		Timeout: time.Duration(5 * time.Second),
+		Target:     "localhost:5050",
+		Timeout:    time.Duration(5 * time.Second),
+		RPCTimeout: time.Duration(2 * time.Second),
 		Opts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		},
