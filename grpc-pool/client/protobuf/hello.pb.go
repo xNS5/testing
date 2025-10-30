@@ -24,6 +24,7 @@ const (
 type Request struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Timeout       *int32                 `protobuf:"varint,1,opt,name=timeout,proto3,oneof" json:"timeout,omitempty"`
+	Msg           *string                `protobuf:"bytes,2,opt,name=msg,proto3,oneof" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63,6 +64,13 @@ func (x *Request) GetTimeout() int32 {
 		return *x.Timeout
 	}
 	return 0
+}
+
+func (x *Request) GetMsg() string {
+	if x != nil && x.Msg != nil {
+		return *x.Msg
+	}
+	return ""
 }
 
 type Response struct {
@@ -113,11 +121,13 @@ var File_hello_proto protoreflect.FileDescriptor
 
 const file_hello_proto_rawDesc = "" +
 	"\n" +
-	"\vhello.proto\x12\x05hello\"4\n" +
+	"\vhello.proto\x12\x05hello\"S\n" +
 	"\aRequest\x12\x1d\n" +
-	"\atimeout\x18\x01 \x01(\x05H\x00R\atimeout\x88\x01\x01B\n" +
+	"\atimeout\x18\x01 \x01(\x05H\x00R\atimeout\x88\x01\x01\x12\x15\n" +
+	"\x03msg\x18\x02 \x01(\tH\x01R\x03msg\x88\x01\x01B\n" +
 	"\n" +
-	"\b_timeout\"\x1c\n" +
+	"\b_timeoutB\x06\n" +
+	"\x04_msg\"\x1c\n" +
 	"\bResponse\x12\x10\n" +
 	"\x03res\x18\x01 \x01(\tR\x03res23\n" +
 	"\x05Hello\x12*\n" +

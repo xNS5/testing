@@ -1,7 +1,6 @@
 package grpc_pool
 
 import (
-	"context"
 	"fmt"
 	"grpc_client/grpc_pool/states"
 	"sync/atomic"
@@ -26,25 +25,25 @@ const idleThreshold = time.Duration(30 * time.Second)
 /*
 CONNECTION LIFECYCLE
 */
-func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
+// func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 
-	pool := c.PoolRef
+// 	pool := c.PoolRef
 
-	if pool == nil {
-		return fmt.Errorf("pool is nil")
-	}
+// 	if pool == nil {
+// 		return fmt.Errorf("pool is nil")
+// 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+// 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
+// 	go func() {
+// 		<-ctx.Done()
+// 		cancel()
+// 	}()
 
-	defer pool.Release(c)
+// 	defer pool.Release(c)
 
-	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
-}
+// 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
+// }
 
 func (c *Conn) touch() {
 	if c.state.Load() >= states.CLOSING {

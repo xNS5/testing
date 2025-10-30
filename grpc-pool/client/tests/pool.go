@@ -25,7 +25,7 @@ func GetPool() (*grpc_pool.Pool, error) {
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		},
 		MaxConns:   2,
-		MaxPerConn: 5,
+		MaxPerConn: 2,
 	}
 
 	// fmt.Println("Initializing gRPC Pool")

@@ -59,7 +59,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	for _, c := range p.Conns {
 		if c.canAccept(p.MaxPerConn) {
-			// fmt.Println("Found best connection", c.ID)
+			fmt.Println("Found best connection", c.ID)
 			best = c
 			c.touch()
 			break
@@ -69,6 +69,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	if len(p.Conns) < p.MaxConns {
 
 		if best == nil {
+			fmt.Println("Connection full, creating new client")
 			conn, err := NewClient(p)
 
 			if err != nil {

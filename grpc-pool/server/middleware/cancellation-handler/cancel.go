@@ -2,9 +2,7 @@ package cancellationhandler
 
 import (
 	"context"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"fmt"
 )
 
 func WithHandlerCancellation(
@@ -29,7 +27,7 @@ func WithHandlerCancellation(
 		case r := <-respCh:
 			return r.resp, r.err
 		case <-ctx.Done():
-			return nil, status.Error(codes.Canceled, "handler canceled")
+			return nil, fmt.Errorf("handler canceled")
 		}
 	}
 }

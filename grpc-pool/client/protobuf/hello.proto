@@ -10,6 +10,7 @@ service Hello {
 
 message Request {
   optional int32 timeout = 1;
+  optional string msg = 2;
 }
 
 message Response {
