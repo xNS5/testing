@@ -30,6 +30,7 @@ func NewClient(pool *Pool) (*Conn, error) {
 		ID:         uuid.New(),
 		ClientConn: conn,
 		timeout:    pool.RPCTimeout,
+		PoolRef:    pool,
 	}, err
 }
 
@@ -44,7 +45,6 @@ func NewPool(pool *Pool) (*Pool, error) {
 		return nil, err
 	}
 
-	conn.PoolRef = pool
 	pool.Conns = []*Conn{conn}
 
 	return pool, nil
