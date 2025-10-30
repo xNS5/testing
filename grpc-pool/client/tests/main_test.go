@@ -137,7 +137,7 @@ func TestNewConn(t *testing.T) {
 				os.Exit(-1)
 			}
 
-			if res.Res != "Hello, world!" {
+			if res.Res != msg {
 				t.Errorf("hello request error: %v", err)
 				os.Exit(-1)
 			}

@@ -66,16 +66,17 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		}
 	}
 
-	if len(p.Conns) < p.MaxConns {
+	if len(p.Conns) <= p.MaxConns {
 
 		if best == nil {
-			fmt.Println("Connection full, creating new client")
+
 			conn, err := NewClient(p)
 
 			if err != nil {
 				return nil, err
 			}
 			best = conn
+			fmt.Println("Connection full, creating new client", conn.ID)
 			p.Conns = append(p.Conns, best)
 		}
 

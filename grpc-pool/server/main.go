@@ -24,6 +24,12 @@ func (h *HelloServer) Hello(ctx context.Context, foo *hello.Request) (*hello.Res
 		}
 	}
 
+	if foo.Msg != nil {
+		return &hello.Response{
+			Res: *foo.Msg,
+		}, nil
+	}
+
 	return &hello.Response{
 		Res: fmt.Sprintf("Hello, world! %v", foo.Msg),
 	}, nil
