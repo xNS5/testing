@@ -11,10 +11,14 @@ import (
 
 var Pool *grpc_pool.Pool
 
-func GetPool() (*grpc_pool.Pool, error) {
+func Reset() {
+	Pool = nil
+}
+
+func GetPool() (*grpc_pool.Pool, func(), error) {
 
 	if Pool != nil {
-		return Pool, nil
+		return Pool, nil, nil
 	}
 
 	poolConfig := &grpc_pool.Pool{
@@ -33,11 +37,11 @@ func GetPool() (*grpc_pool.Pool, error) {
 
 	if err != nil {
 		fmt.Println("Error initializing grpc pool")
-		return nil, err
+		return nil, nil, err
 	}
 
 	Pool = pool
 
-	return pool, nil
+	return pool, Reset, nil
 
 }

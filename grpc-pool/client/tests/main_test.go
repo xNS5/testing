@@ -9,10 +9,6 @@ import (
 	"testing"
 )
 
-func Reset() {
-	Pool = nil
-}
-
 /*
 TestConnection
 Tests whether the pool can establish a connection
@@ -21,7 +17,7 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool()
+	pool, Reset, err := GetPool()
 
 	defer Reset()
 
@@ -64,7 +60,7 @@ func TestTimeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool()
+	pool, Reset, err := GetPool()
 
 	defer Reset()
 
@@ -104,7 +100,7 @@ func TestNewConn(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool()
+	pool, Reset, err := GetPool()
 
 	defer Reset()
 
