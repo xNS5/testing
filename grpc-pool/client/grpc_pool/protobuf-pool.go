@@ -64,7 +64,6 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		if c.canAccept(p.MaxPerConn) {
 			fmt.Println("Found best connection", c.ID)
 			best = c
-			c.touch()
 			break
 		}
 	}
@@ -84,6 +83,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
 
+	best.touch()
 	best.active.Add(1)
 
 	return best, nil
