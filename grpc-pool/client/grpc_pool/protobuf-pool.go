@@ -26,12 +26,16 @@ type Pool struct {
 func NewClient(pool *Pool) (*Conn, error) {
 	conn, err := grpc.NewClient(pool.Target, pool.Opts...)
 
-	return &Conn{
+	newConn :=  &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
 		timeout:    pool.RPCTimeout,
 		PoolRef:    pool,
-	}, err
+	}
+
+	newConn.state.Store(states.IDLE)
+
+	return newConn, err
 }
 
 func NewPool(pool *Pool) (*Pool, error) {
@@ -52,7 +56,6 @@ func NewPool(pool *Pool) (*Pool, error) {
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	p.Mtx.Lock()
-
 	defer p.Mtx.Unlock()
 
 	var best *Conn
@@ -67,11 +70,8 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	}
 
 	if len(p.Conns) <= p.MaxConns {
-
 		if best == nil {
-
 			conn, err := NewClient(p)
-
 			if err != nil {
 				return nil, err
 			}
@@ -95,18 +95,24 @@ func (p *Pool) Release(c *Conn) {
 
 	if c.active.Load() > 0 {
 		c.active.Add(-1)
-	}
-
-	if c.active.Load() == 0 {
-		c.state.Swap(states.IDLE)
+	} else if c.active.Load() == 0 {
+		c.state.CompareAndSwap(states.ALIVE, states.IDLE)
 	}
 }
 
 func (p *Pool) Clean() {
+
+	if len(p.Conns) == 0 {
+		fmt.Println("No connections, skipping...")
+		return
+	}
+
 	p.Mtx.Lock()
+	defer p.Mtx.Unlock()
+	
 
 	alive_conns := make([]*Conn, 0, len(p.Conns))
-	to_close := make([]*Conn, 0)
+	to_close := make(chan *Conn)
 
 	for i, c := range p.Conns {
 		if i == 0 || !c.isIdle() {
@@ -114,24 +120,38 @@ func (p *Pool) Clean() {
 		}
 
 		if c.state.CompareAndSwap(states.IDLE, states.CLOSING) {
-			to_close = append(to_close, c)
+			fmt.Println("Closing ", c.ID)
+			to_close <- c
 		}
 	}
 
 	p.Conns = alive_conns
-	p.Mtx.Unlock()
+	
 
-	for _, c := range to_close {
+	for c := range to_close {
 		if err := c.safeClose(); err != nil {
 			fmt.Printf("Unable to safe close: %v", err)
 		}
 	}
 }
 
+func (p *Pool) ScheduledCleanup(ctx context.Context){
+	ticker := time.NewTicker(30 * time.Second)
+
+	go func(){
+		for {
+			t := <-ticker.C
+			fmt.Println("Current time: ", t)
+			p.Clean()
+		}
+	}()
+
+	defer ticker.Stop()
+}
+
 /*
 INTERCEPTORS
 */
-
 func (p *Pool) LoggingInterceptor(ctx context.Context,
 	method string,
 	req any,
@@ -140,6 +160,5 @@ func (p *Pool) LoggingInterceptor(ctx context.Context,
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) error {
-
 	return invoker(ctx, method, req, reply, cc, opts...)
 }

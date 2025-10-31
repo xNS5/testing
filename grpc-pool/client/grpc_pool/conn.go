@@ -50,16 +50,18 @@ func (c *Conn) touch() {
 	if c.state.Load() >= states.CLOSING {
 		return
 	}
+
+	c.state.Swap(states.ALIVE)
+	c.active.Add(1)
 	c.lastUsed.Store(time.Now().UnixNano())
 }
+
 
 func (c *Conn) isIdle() bool {
 	lastUsed := time.Unix(0, c.lastUsed.Load())
 	elapsed := time.Since(lastUsed)
 
-	currState := c.state.Load()
-
-	return elapsed > idleThreshold && currState == states.IDLE && c.active.Load() == 0
+	return elapsed > idleThreshold && c.active.Load() == 0
 }
 
 func (c *Conn) canAccept(maxRPC int) bool {
@@ -71,10 +73,10 @@ func (c *Conn) canAccept(maxRPC int) bool {
 }
 
 func (c *Conn) safeClose() error {
-
-	if !c.state.CompareAndSwap(states.IDLE, states.CLOSING) && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) {
+	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
 		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
 	}
+	
 	_ = c.ClientConn.Close()
 	c.state.Store(states.CLOSED)
 	return nil

@@ -14,8 +14,8 @@ func UnaryCancellationInterceptor() grpc.UnaryServerInterceptor {
 		handler grpc.UnaryHandler,
 	) (resp any, err error) {
 
-		newHandler := WithHandlerCancellation(handler)
+		cancelWrapper := WithHandlerCancellation(handler)
 
-		return newHandler(ctx, req)
+		return cancelWrapper(ctx, req)
 	}
 }
