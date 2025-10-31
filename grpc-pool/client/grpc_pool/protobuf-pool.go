@@ -101,14 +101,13 @@ func (p *Pool) Release(c *Conn) {
 }
 
 func (p *Pool) Clean() {
+	p.Mtx.Lock()
+	defer p.Mtx.Unlock()
 
 	if len(p.Conns) == 0 {
 		fmt.Println("No connections, skipping...")
 		return
 	}
-
-	p.Mtx.Lock()
-	defer p.Mtx.Unlock()
 	
 
 	alive_conns := make([]*Conn, 0, len(p.Conns))
