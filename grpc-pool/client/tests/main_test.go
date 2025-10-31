@@ -9,6 +9,10 @@ import (
 	"testing"
 )
 
+func Reset() {
+	Pool = nil
+}
+
 /*
 TestConnection
 Tests whether the pool can establish a connection
@@ -18,6 +22,8 @@ func TestConnection(t *testing.T) {
 	ctx := context.Background()
 
 	pool, err := GetPool()
+
+	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -60,6 +66,8 @@ func TestTimeout(t *testing.T) {
 
 	pool, err := GetPool()
 
+	defer Reset()
+
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
 		os.Exit(-1)
@@ -97,6 +105,8 @@ func TestNewConn(t *testing.T) {
 	ctx := context.Background()
 
 	pool, err := GetPool()
+
+	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
