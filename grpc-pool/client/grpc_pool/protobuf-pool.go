@@ -26,7 +26,7 @@ type Pool struct {
 func NewClient(pool *Pool) (*Conn, error) {
 	conn, err := grpc.NewClient(pool.Target, pool.Opts...)
 
-	newConn :=  &Conn{
+	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
 		timeout:    pool.RPCTimeout,
@@ -108,7 +108,6 @@ func (p *Pool) Clean() {
 		fmt.Println("No connections, skipping...")
 		return
 	}
-	
 
 	alive_conns := make([]*Conn, 0, len(p.Conns))
 	to_close := make(chan *Conn)
@@ -125,7 +124,6 @@ func (p *Pool) Clean() {
 	}
 
 	p.Conns = alive_conns
-	
 
 	for c := range to_close {
 		if err := c.safeClose(); err != nil {
@@ -134,13 +132,12 @@ func (p *Pool) Clean() {
 	}
 }
 
-func (p *Pool) ScheduledCleanup(ctx context.Context){
+func (p *Pool) ScheduledCleanup(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 
-	go func(){
+	go func() {
 		for {
-			t := <-ticker.C
-			fmt.Println("Current time: ", t)
+			<-ticker.C
 			p.Clean()
 		}
 	}()
