@@ -27,23 +27,7 @@ const idleThreshold = time.Duration(30 * time.Second)
 CONNECTION LIFECYCLE
 */
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-
-	pool := c.PoolRef
-
-	if pool == nil {
-		return fmt.Errorf("pool is nil")
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
-
-	defer pool.Release(c)
-
-	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
+	return c.PoolRef.Invoke(ctx, method, args, reply, opts...)
 }
 
 func (c *Conn) touch() {
@@ -55,7 +39,6 @@ func (c *Conn) touch() {
 	c.active.Add(1)
 	c.lastUsed.Store(time.Now().UnixNano())
 }
-
 
 func (c *Conn) isIdle() bool {
 	lastUsed := time.Unix(0, c.lastUsed.Load())
@@ -69,14 +52,14 @@ func (c *Conn) canAccept(maxRPC int) bool {
 		return false
 	}
 
-	return c.active.Load() < int32(maxRPC)
+	return c.active.Load() < int32(maxRPC)+1
 }
 
 func (c *Conn) safeClose() error {
 	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
 		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
 	}
-	
+
 	_ = c.ClientConn.Close()
 	c.state.Store(states.CLOSED)
 	return nil

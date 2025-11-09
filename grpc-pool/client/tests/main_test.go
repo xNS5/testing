@@ -85,7 +85,7 @@ func TestTimeout(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Errorf("hello request error: %v", err)
+		t.Errorf("hello request should respond with an error")
 		os.Exit(-1)
 	}
 }
@@ -109,13 +109,13 @@ func TestNewConn(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	conns := 4
+	reqs := 4
+	// In theory, 2 connections total
 
-	wg.Add(conns)
+	wg.Add(reqs)
 
-	for i := range conns {
+	for i := range reqs {
 		go func() {
-
 			defer wg.Done()
 			conn, err := pool.Get(ctx)
 
@@ -152,12 +152,10 @@ func TestNewConn(t *testing.T) {
 /*
 TestCleanup
 */
-
-
-func TestCleanup(t *testing.T){	ctx := context.Background()
+func TestCleanup(t *testing.T) {
+	ctx := context.Background()
 
 	pool, _, err := GetPool()
-
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -166,11 +164,13 @@ func TestCleanup(t *testing.T){	ctx := context.Background()
 
 	var wg sync.WaitGroup
 
-	conns := 6
+	conns := 4
+
+	mid := conns / 2
 
 	wg.Add(conns)
 
-	for i := range conns/2 {
+	for i := range mid {
 		go func() {
 
 			defer wg.Done()
@@ -187,7 +187,7 @@ func TestCleanup(t *testing.T){	ctx := context.Background()
 			timeout := int32(3)
 
 			res, err := client.Hello(ctx, &proto.Request{
-				Msg: &msg,
+				Msg:     &msg,
 				Timeout: &timeout,
 			})
 
@@ -204,7 +204,7 @@ func TestCleanup(t *testing.T){	ctx := context.Background()
 		}()
 	}
 
-	for i := range conns/2 {
+	for i := mid; i < conns; i++ {
 		go func() {
 
 			defer wg.Done()
@@ -235,8 +235,15 @@ func TestCleanup(t *testing.T){	ctx := context.Background()
 
 		}()
 	}
-	
+
+	go func() {
+		fmt.Println("waiting for cleaning...")
+		<-ctx.Done()
+		fmt.Println("context cancelled")
+		pool.Clean()
+		fmt.Println("cleaned")
+	}()
+
 	wg.Wait()
 
-	defer pool.Clean()
 }

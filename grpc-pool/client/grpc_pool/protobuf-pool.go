@@ -54,6 +54,26 @@ func NewPool(pool *Pool) (*Pool, error) {
 	return pool, nil
 }
 
+func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
+
+	conn, err := p.Get(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, conn.timeout)
+
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
+
+	defer p.Release(conn)
+
+	return conn.ClientConn.Invoke(ctx, method, args, reply, opts...)
+}
+
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	p.Mtx.Lock()
 	defer p.Mtx.Unlock()
@@ -68,7 +88,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		}
 	}
 
-	if len(p.Conns) <= p.MaxConns {
+	if len(p.Conns) < p.MaxConns+1 {
 		if best == nil {
 			conn, err := NewClient(p)
 			if err != nil {
@@ -78,7 +98,6 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 			fmt.Println("Connection full, creating new client", conn.ID)
 			p.Conns = append(p.Conns, best)
 		}
-
 	} else {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
@@ -107,6 +126,8 @@ func (p *Pool) Clean() {
 	if len(p.Conns) == 0 {
 		fmt.Println("No connections, skipping...")
 		return
+	} else {
+		fmt.Println("Beginning cleanup")
 	}
 
 	alive_conns := make([]*Conn, 0, len(p.Conns))
@@ -115,6 +136,7 @@ func (p *Pool) Clean() {
 	for i, c := range p.Conns {
 		if i == 0 || !c.isIdle() {
 			alive_conns = append(alive_conns, c)
+			fmt.Printf("Keeping: %v\n", c.ID)
 		}
 
 		if c.state.CompareAndSwap(states.IDLE, states.CLOSING) {
@@ -127,7 +149,9 @@ func (p *Pool) Clean() {
 
 	for c := range to_close {
 		if err := c.safeClose(); err != nil {
-			fmt.Printf("Unable to safe close: %v", err)
+			fmt.Printf("Unable to safe close: %v\n", err)
+		} else {
+			fmt.Printf("Closing: %v\n", c.ID)
 		}
 	}
 }
