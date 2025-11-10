@@ -236,14 +236,6 @@ func TestCleanup(t *testing.T) {
 		}()
 	}
 
-	go func() {
-		fmt.Println("waiting for cleaning...")
-		<-ctx.Done()
-		fmt.Println("context cancelled")
-		pool.Clean()
-		fmt.Println("cleaned")
-	}()
-
 	wg.Wait()
 
 }

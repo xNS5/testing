@@ -75,6 +75,7 @@ func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, o
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
+	
 	p.Mtx.Lock()
 	defer p.Mtx.Unlock()
 
@@ -82,7 +83,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	for _, c := range p.Conns {
 		if c.canAccept(p.MaxPerConn) {
-			fmt.Println("Found best connection", c.ID)
+			// fmt.Println("Found best connection", c.ID)
 			best = c
 			break
 		}
@@ -95,7 +96,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 				return nil, err
 			}
 			best = conn
-			fmt.Println("Connection full, creating new client", conn.ID)
+			// fmt.Println("Connection full, creating new client", conn.ID)
 			p.Conns = append(p.Conns, best)
 		}
 	} else {
@@ -120,9 +121,11 @@ func (p *Pool) Release(c *Conn) {
 }
 
 func (p *Pool) Clean() {
-	p.Mtx.Lock()
+	if !p.Mtx.TryLock() {
+		return
+	}
 	defer p.Mtx.Unlock()
-
+	
 	if len(p.Conns) == 0 {
 		fmt.Println("No connections, skipping...")
 		return
@@ -145,9 +148,12 @@ func (p *Pool) Clean() {
 		}
 	}
 
+	close(to_close)
+
 	p.Conns = alive_conns
 
 	for c := range to_close {
+		fmt.Println(c.ID)
 		if err := c.safeClose(); err != nil {
 			fmt.Printf("Unable to safe close: %v\n", err)
 		} else {
@@ -156,17 +162,17 @@ func (p *Pool) Clean() {
 	}
 }
 
-func (p *Pool) ScheduledCleanup(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+func (p *Pool) ScheduledCleanup(ctx context.Context) {	
+	ticker := time.NewTicker(2 * time.Second)
 
 	go func() {
 		for {
 			<-ticker.C
+			fmt.Println("Ticked, cleaning...")
 			p.Clean()
 		}
 	}()
 
-	defer ticker.Stop()
 }
 
 /*

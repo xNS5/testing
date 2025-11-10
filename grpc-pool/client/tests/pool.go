@@ -18,6 +18,8 @@ func Reset() {
 
 func GetPool() (*grpc_pool.Pool, func(), error) {
 
+	ctx := context.Background()
+
 	if Pool != nil {
 		return Pool, nil, nil
 	}
@@ -43,7 +45,7 @@ func GetPool() (*grpc_pool.Pool, func(), error) {
 
 	Pool = pool
 
-	pool.ScheduledCleanup(context.Background())
+	go pool.ScheduledCleanup(ctx)
 
 	return pool, Reset, nil
 }

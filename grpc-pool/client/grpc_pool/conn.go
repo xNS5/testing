@@ -56,6 +56,7 @@ func (c *Conn) canAccept(maxRPC int) bool {
 }
 
 func (c *Conn) safeClose() error {
+	fmt.Println("trying co safe close...")
 	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
 		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
 	}
