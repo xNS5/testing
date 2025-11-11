@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -44,11 +46,7 @@ func TestConnection(t *testing.T) {
 		os.Exit(-1)
 	}
 
-	if res.Res != fmt.Sprintf("Hello, world! %v", msg) {
-		t.Errorf("hello request error: %v", res.Res)
-		os.Exit(-1)
-	}
-
+	assert.Equal(t, res.Res, fmt.Sprintf("Hello, world! %v", msg))
 }
 
 /*
@@ -84,10 +82,7 @@ func TestTimeout(t *testing.T) {
 		Timeout: &timeout,
 	})
 
-	if err == nil {
-		t.Errorf("hello request should respond with an error")
-		os.Exit(-1)
-	}
+	assert.NotNil(t, err)
 }
 
 /*
@@ -147,10 +142,60 @@ func TestNewConn(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+
+	assert.Equal(t, 2, len(pool.Conns))
+}
+
+func TestConcurrentGet(t *testing.T) {
+	ctx := context.Background()
+
+	pool, Reset, err := GetPool()
+
+	defer Reset()
+
+	if err != nil {
+		t.Errorf("Error getting gRPC pool: %v", err)
+		os.Exit(-1)
+	}
+
+	var wg sync.WaitGroup
+
+	for i := range 4 {
+		wg.Go(func() {
+			conn, err := pool.Get(ctx)
+
+			if err != nil {
+				t.Errorf("Error getting connection: %v", err)
+				os.Exit(-1)
+			}
+
+			client := proto.NewHelloClient(conn)
+
+			msg := fmt.Sprintf("Test New Conn %v", i)
+
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg: &msg,
+			})
+
+			if err != nil {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
+
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
+		})
+	}
+
+	wg.Wait()
+	assert.Equal(t, 2, len(pool.Conns))
 }
 
 /*
 TestCleanup
+Needs some work, unsure the direction I want to take with it
 */
 func TestCleanup(t *testing.T) {
 	ctx := context.Background()
@@ -164,13 +209,13 @@ func TestCleanup(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	conns := 4
+	reqs := 10
 
-	mid := conns / 2
+	// mid := reqs / 2
 
-	wg.Add(conns)
+	wg.Add(reqs)
 
-	for i := range mid {
+	for i := range reqs {
 		go func() {
 
 			defer wg.Done()
@@ -204,38 +249,43 @@ func TestCleanup(t *testing.T) {
 		}()
 	}
 
-	for i := mid; i < conns; i++ {
-		go func() {
+	// for i := mid; i < reqs; i++ {
+	// 	go func() {
 
-			defer wg.Done()
-			conn, err := pool.Get(ctx)
+	// 		defer wg.Done()
+	// 		conn, err := pool.Get(ctx)
 
-			if err != nil {
-				t.Errorf("Error getting connection: %v", err)
-				os.Exit(-1)
-			}
+	// 		if err != nil {
+	// 			t.Errorf("Error getting connection: %v", err)
+	// 			os.Exit(-1)
+	// 		}
 
-			client := proto.NewHelloClient(conn)
+	// 		client := proto.NewHelloClient(conn)
 
-			msg := fmt.Sprintf("Test New Conn %v", i)
+	// 		msg := fmt.Sprintf("Test New Conn %v", i)
 
-			res, err := client.Hello(ctx, &proto.Request{
-				Msg: &msg,
-			})
+	// 		res, err := client.Hello(ctx, &proto.Request{
+	// 			Msg: &msg,
+	// 		})
 
-			if err != nil {
-				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
-			}
+	// 		if err != nil {
+	// 			t.Errorf("hello request error: %v", err)
+	// 			os.Exit(-1)
+	// 		}
 
-			if res.Res != msg {
-				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
-			}
+	// 		if res.Res != msg {
+	// 			t.Errorf("hello request error: %v", err)
+	// 			os.Exit(-1)
+	// 		}
 
-		}()
-	}
+	// 	}()
+	// }
 
 	wg.Wait()
 
+	assert.Equal(t, 5, len(pool.Conns))
+
+	pool.Clean()
+
+	assert.Equal(t, 1, len(pool.Conns))
 }

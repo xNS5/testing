@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"fmt"
 	"grpc_client/grpc_pool"
 	"time"
@@ -18,7 +17,7 @@ func Reset() {
 
 func GetPool() (*grpc_pool.Pool, func(), error) {
 
-	ctx := context.Background()
+	// ctx := context.Background()
 
 	if Pool != nil {
 		return Pool, nil, nil
@@ -27,11 +26,11 @@ func GetPool() (*grpc_pool.Pool, func(), error) {
 	poolConfig := &grpc_pool.Pool{
 		Target:     "localhost:5050",
 		Timeout:    time.Duration(10 * time.Second),
-		RPCTimeout: time.Duration(5 * time.Second),
+		RPCTimeout: time.Duration(4 * time.Second),
 		Opts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		},
-		MaxConns:   4,
+		MaxConns:   10,
 		MaxPerConn: 2,
 	}
 
@@ -45,7 +44,7 @@ func GetPool() (*grpc_pool.Pool, func(), error) {
 
 	Pool = pool
 
-	go pool.ScheduledCleanup(ctx)
+	// go pool.ScheduledCleanup(ctx)
 
 	return pool, Reset, nil
 }
