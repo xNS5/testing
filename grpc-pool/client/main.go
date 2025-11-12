@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"grpc_client/grpc_pool"
+	"grpc_client/pool"
 	"time"
 
 	"google.golang.org/grpc"
@@ -12,7 +12,7 @@ import (
 
 func main() {
 
-	poolConfig := &grpc_pool.Pool{
+	poolConfig := &pool.Pool{
 		Target:     "localhost:5050",
 		Timeout:    time.Duration(30 * time.Second),
 		Opts:       []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -21,7 +21,7 @@ func main() {
 	}
 
 	fmt.Println("Initializing gRPC Pool")
-	pool, err := grpc_pool.NewPool(poolConfig)
+	pool, err := pool.NewPool(poolConfig)
 
 	if err != nil {
 		fmt.Println("Error initializing grpc pool")

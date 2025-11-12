@@ -2,20 +2,20 @@ package tests
 
 import (
 	"fmt"
-	"grpc_client/grpc_pool"
+	"grpc_client/pool"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var Pool *grpc_pool.Pool
+var Pool *pool.Pool
 
 func Reset() {
 	Pool = nil
 }
 
-func GetPool() (*grpc_pool.Pool, func(), error) {
+func GetPool() (*pool.Pool, func(), error) {
 
 	// ctx := context.Background()
 
@@ -23,7 +23,7 @@ func GetPool() (*grpc_pool.Pool, func(), error) {
 		return Pool, nil, nil
 	}
 
-	poolConfig := &grpc_pool.Pool{
+	poolConfig := &pool.Pool{
 		Target:     "localhost:5050",
 		Timeout:    time.Duration(10 * time.Second),
 		RPCTimeout: time.Duration(4 * time.Second),
@@ -35,7 +35,7 @@ func GetPool() (*grpc_pool.Pool, func(), error) {
 	}
 
 	// fmt.Println("Initializing gRPC Pool")
-	pool, err := grpc_pool.NewPool(poolConfig)
+	pool, err := pool.NewPool(poolConfig)
 
 	if err != nil {
 		fmt.Println("Error initializing grpc pool")

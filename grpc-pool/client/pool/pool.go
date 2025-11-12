@@ -1,9 +1,9 @@
-package grpc_pool
+package pool
 
 import (
 	"context"
 	"fmt"
-	"grpc_client/grpc_pool/states"
+	"grpc_client/pool/states"
 
 	"sync"
 	"time"
@@ -62,12 +62,12 @@ func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, o
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, conn.timeout)
+	// ctx, cancel := context.WithTimeout(ctx, conn.timeout)
 
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
+	// go func() {
+	// 	<-ctx.Done()
+	// 	cancel()
+	// }()
 
 	defer p.Release(conn)
 
@@ -75,9 +75,6 @@ func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, o
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
-
-	p.Mtx.Lock()
-	defer p.Mtx.Unlock()
 
 	var best *Conn
 
@@ -89,33 +86,39 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 		}
 	}
 
-	if len(p.Conns) < p.MaxConns+1 {
+	if len(p.Conns) <= p.MaxConns {
 		if best == nil {
 			conn, err := NewClient(p)
 			if err != nil {
 				return nil, err
 			}
+
 			best = conn
+
 			fmt.Println("Connection full, creating new client", conn.ID)
+
+			p.Mtx.Lock()
+			defer p.Mtx.Unlock()
 			p.Conns = append(p.Conns, best)
 		}
 	} else {
 		return nil, fmt.Errorf("pool is at capacity")
 	}
 
+	fmt.Println(len(p.Conns))
+
 	best.touch()
-	best.active.Add(1)
+
+	// fmt.Printf("Num Conns: %v\r\nBest ID: %v\n", len(p.Conns), best.ID)
 
 	return best, nil
 }
 
 func (p *Pool) Release(c *Conn) {
-	p.Mtx.Lock()
-	defer p.Mtx.Unlock()
-
-	if c.active.Load() > 0 {
+	curr_load := c.active.Load()
+	if curr_load > 0 {
 		c.active.Add(-1)
-	} else if c.active.Load() == 0 {
+	} else if curr_load == 0 {
 		c.state.CompareAndSwap(states.ALIVE, states.IDLE)
 	}
 }
