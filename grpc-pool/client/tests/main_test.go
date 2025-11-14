@@ -144,6 +144,12 @@ func TestNewConn(t *testing.T) {
 	assert.Equal(t, 2, len(pool.Conns))
 }
 
+/*
+TestConcurrentGet
+Tests running n connection requests concurrently to the server.
+Expected result: the pool creates ( numConns // numPerCon ) connections
+*/
+
 func TestConcurrentGet(t *testing.T) {
 	ctx := context.Background()
 
@@ -158,7 +164,7 @@ func TestConcurrentGet(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	for range 4 {
+	for i := range 4 {
 		conn, err := pool.Get(ctx)
 
 		if err != nil {
@@ -170,11 +176,11 @@ func TestConcurrentGet(t *testing.T) {
 
 		wg.Go(func() {
 
-			// msg := fmt.Sprintf("Test New Conn %v", i)
+			msg := fmt.Sprintf("Test New Conn %v", i)
 			timeout := int32(5)
 
-			_, err = client.Hello(ctx, &proto.Request{
-				// Msg:     &msg,
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg:     &msg,
 				Timeout: &timeout,
 			})
 
@@ -183,10 +189,10 @@ func TestConcurrentGet(t *testing.T) {
 				os.Exit(-1)
 			}
 
-			// if res.Res != msg {
-			// 	t.Errorf("hello request error: %v", err)
-			// 	os.Exit(-1)
-			// }
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
 		})
 	}
 

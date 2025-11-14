@@ -54,27 +54,10 @@ func NewPool(pool *Pool) (*Pool, error) {
 	return pool, nil
 }
 
-func (p *Pool) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-
-	conn, err := p.Get(ctx)
-
-	if err != nil {
-		return err
-	}
-
-	// ctx, cancel := context.WithTimeout(ctx, conn.timeout)
-
-	// go func() {
-	// 	<-ctx.Done()
-	// 	cancel()
-	// }()
-
-	defer p.Release(conn)
-
-	return conn.ClientConn.Invoke(ctx, method, args, reply, opts...)
-}
-
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
+
+	p.Mtx.Lock()
+	defer p.Mtx.Unlock()
 
 	var best *Conn
 
@@ -97,8 +80,6 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 			fmt.Println("Connection full, creating new client", conn.ID)
 
-			p.Mtx.Lock()
-			defer p.Mtx.Unlock()
 			p.Conns = append(p.Conns, best)
 		}
 	} else {

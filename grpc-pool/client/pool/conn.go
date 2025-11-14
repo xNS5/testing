@@ -31,6 +31,13 @@ CONNECTION LIFECYCLE
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 	defer c.PoolRef.Release(c)
 
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
+
 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
 
 	// return c.PoolRef.Invoke(ctx, method, args, reply, opts...)
@@ -58,12 +65,12 @@ func (c *Conn) isIdle() bool {
 	return elapsed > idleThreshold && c.active.Load() > -1
 }
 
-func (c *Conn) canAccept(maxRPC int) bool {
+func (c *Conn) canAccept(maxPerRpc int) bool {
 	if c.state.Load() >= states.CLOSING {
 		return false
 	}
 
-	return c.active.Load() <= int32(maxRPC)
+	return c.active.Load() < int32(maxPerRpc)
 }
 
 func (c *Conn) safeClose() error {
