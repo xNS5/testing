@@ -14,13 +14,13 @@ import (
 
 type Conn struct {
 	*grpc.ClientConn
+	Mtx      sync.Mutex
 	PoolRef  *Pool
 	ID       uuid.UUID
-	timeout  time.Duration
 	active   atomic.Int32
+	timeout  time.Duration
 	state    atomic.Int32
 	lastUsed atomic.Int64
-	Mtx      sync.Mutex
 }
 
 const idleThreshold = time.Duration(30 * time.Second)

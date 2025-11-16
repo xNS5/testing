@@ -16,21 +16,26 @@ type Pool struct {
 	Mtx        sync.Mutex
 	Conns      []*Conn
 	Target     string
-	Opts       []grpc.DialOption
-	Timeout    time.Duration
-	RPCTimeout time.Duration
-	MaxConns   int
-	MaxPerConn int
+	Cfg		   *PoolConfig
+	CurrLoad 	int
 }
 
+type PoolConfig struct {
+	MinConns int
+	MaxConns int
+	Opts       []grpc.DialOption
+	IdleTimeout time.Duration
+	PruneInterval time.Duration
+	DialTimeout   time.Duration
+}
+
+
 func NewClient(pool *Pool) (*Conn, error) {
-	conn, err := grpc.NewClient(pool.Target, pool.Opts...)
+	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
 
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
-		timeout:    pool.RPCTimeout,
-		PoolRef:    pool,
 	}
 
 	newConn.state.Store(states.IDLE)
@@ -38,18 +43,22 @@ func NewClient(pool *Pool) (*Conn, error) {
 	return newConn, err
 }
 
-func NewPool(pool *Pool) (*Pool, error) {
-	if pool.MaxConns <= 0 {
+func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
+	if cfg.MaxConns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
-	conn, err := NewClient(pool)
-
-	if err != nil {
-		return nil, err
+	pool := &Pool{
+		Target: target,
+		Cfg: cfg,
+		Conns: make([]*Conn, cfg.MinConns),
 	}
 
-	pool.Conns = []*Conn{conn}
+	for range cfg.MinConns {
+		if conn, err := NewClient(pool); err == nil {
+			pool.Conns = append(pool.Conns, conn)
+		}
+	}
 
 	return pool, nil
 }
@@ -62,14 +71,14 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	var best *Conn
 
 	for _, c := range p.Conns {
-		if c.canAccept(p.MaxPerConn) {
+		if c.canAccept(p.Cfg.MinConns) {
 			fmt.Println("Found best connection", c.ID)
 			best = c
 			break
 		}
 	}
 
-	if len(p.Conns) <= p.MaxConns {
+	if len(p.Conns) <= p.Cfg.MinConns {
 		if best == nil {
 			conn, err := NewClient(p)
 			if err != nil {
@@ -89,9 +98,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	fmt.Println(len(p.Conns))
 
 	best.touch()
-
-	// fmt.Printf("Num Conns: %v\r\nBest ID: %v\n", len(p.Conns), best.ID)
-
+	
 	return best, nil
 }
 
