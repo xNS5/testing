@@ -12,16 +12,20 @@ import (
 
 func main() {
 
-	poolConfig := &pool.Pool{
-		Target:     "localhost:5050",
-		Timeout:    time.Duration(30 * time.Second),
-		Opts:       []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		MaxConns:   2,
-		MaxPerConn: 5,
+	target := "localhost:5050"
+
+	poolConfig := &pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    5,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(10 * time.Second),
 	}
 
 	fmt.Println("Initializing gRPC Pool")
-	pool, err := pool.NewPool(poolConfig)
+
+	pool, err := pool.NewPool(target, poolConfig)
 
 	if err != nil {
 		fmt.Println("Error initializing grpc pool")

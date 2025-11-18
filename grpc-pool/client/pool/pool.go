@@ -13,22 +13,22 @@ import (
 )
 
 type Pool struct {
-	Mtx        sync.Mutex
-	Conns      []*Conn
-	Target     string
-	Cfg		   *PoolConfig
-	CurrLoad 	int
+	Mtx      sync.Mutex
+	Conns    []*Conn
+	Target   string
+	Cfg      *PoolConfig
+	CurrLoad int
 }
 
 type PoolConfig struct {
-	MinConns int
-	MaxConns int
-	Opts       []grpc.DialOption
-	IdleTimeout time.Duration
+	MinConns      int
+	MaxConns      int
+	Opts          []grpc.DialOption
+	IdleTimeout   time.Duration
 	PruneInterval time.Duration
 	DialTimeout   time.Duration
+	ReqTimeout    time.Duration
 }
-
 
 func NewClient(pool *Pool) (*Conn, error) {
 	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
@@ -36,6 +36,7 @@ func NewClient(pool *Pool) (*Conn, error) {
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
+		Timeout:    pool.Cfg.ReqTimeout,
 	}
 
 	newConn.state.Store(states.IDLE)
@@ -50,13 +51,13 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 	pool := &Pool{
 		Target: target,
-		Cfg: cfg,
-		Conns: make([]*Conn, cfg.MinConns),
+		Cfg:    cfg,
+		Conns:  make([]*Conn, cfg.MaxConns),
 	}
 
-	for range cfg.MinConns {
+	for i := range cfg.MinConns {
 		if conn, err := NewClient(pool); err == nil {
-			pool.Conns = append(pool.Conns, conn)
+			pool.Conns[i] = conn
 		}
 	}
 
@@ -64,22 +65,20 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
-
-	p.Mtx.Lock()
-	defer p.Mtx.Unlock()
-
 	var best *Conn
 
-	for _, c := range p.Conns {
-		if c.canAccept(p.Cfg.MinConns) {
+	for i := range p.Cfg.MaxConns {
+		if c := p.Conns[i]; c == nil {
+			break
+		} else if c.canAccept(p.Cfg.MinConns) {
 			fmt.Println("Found best connection", c.ID)
 			best = c
 			break
 		}
 	}
 
-	if len(p.Conns) <= p.Cfg.MinConns {
-		if best == nil {
+	if best == nil {
+		if p.CurrLoad < p.Cfg.MaxConns {
 			conn, err := NewClient(p)
 			if err != nil {
 				return nil, err
@@ -89,16 +88,18 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 			fmt.Println("Connection full, creating new client", conn.ID)
 
-			p.Conns = append(p.Conns, best)
+			p.Mtx.Lock()
+			p.Conns[p.CurrLoad-1] = best
+			p.Mtx.Unlock()
+
+		} else {
+			return nil, fmt.Errorf("pool is at capacity")
 		}
-	} else {
-		return nil, fmt.Errorf("pool is at capacity")
+
 	}
 
-	fmt.Println(len(p.Conns))
-
 	best.touch()
-	
+
 	return best, nil
 }
 
@@ -111,60 +112,60 @@ func (p *Pool) Release(c *Conn) {
 	}
 }
 
-func (p *Pool) Clean() {
-	if !p.Mtx.TryLock() {
-		return
-	}
-	defer p.Mtx.Unlock()
+// func (p *Pool) Clean() {
+// 	if !p.Mtx.TryLock() {
+// 		return
+// 	}
+// 	defer p.Mtx.Unlock()
 
-	if len(p.Conns) == 0 {
-		fmt.Println("No connections, skipping...")
-		return
-	} else {
-		fmt.Println("Beginning cleanup")
-	}
+// 	if len(p.Conns) == 0 {
+// 		fmt.Println("No connections, skipping...")
+// 		return
+// 	} else {
+// 		fmt.Println("Beginning cleanup")
+// 	}
 
-	alive_conns := make([]*Conn, 0, len(p.Conns))
-	to_close := make(chan *Conn)
+// 	alive_conns := make([]*Conn, 0, len(p.Conns))
+// 	to_close := make(chan *Conn)
 
-	for i, c := range p.Conns {
-		if i == 0 || !c.isIdle() {
-			alive_conns = append(alive_conns, c)
-			fmt.Printf("Keeping: %v\n", c.ID)
-		}
+// 	for i, c := range p.Conns {
+// 		if i == 0 || !c.isIdle() {
+// 			alive_conns = append(alive_conns, c)
+// 			fmt.Printf("Keeping: %v\n", c.ID)
+// 		}
 
-		if c.state.CompareAndSwap(states.IDLE, states.CLOSING) {
-			fmt.Println("Closing ", c.ID)
-			to_close <- c
-		}
-	}
+// 		if c.state.CompareAndSwap(states.IDLE, states.CLOSING) {
+// 			fmt.Println("Closing ", c.ID)
+// 			to_close <- c
+// 		}
+// 	}
 
-	close(to_close)
+// 	close(to_close)
 
-	p.Conns = alive_conns
+// 	p.Conns = alive_conns
 
-	for c := range to_close {
-		fmt.Println(c.ID)
-		if err := c.safeClose(); err != nil {
-			fmt.Printf("Unable to safe close: %v\n", err)
-		} else {
-			fmt.Printf("Closing: %v\n", c.ID)
-		}
-	}
-}
+// 	for c := range to_close {
+// 		fmt.Println(c.ID)
+// 		if err := c.safeClose(); err != nil {
+// 			fmt.Printf("Unable to safe close: %v\n", err)
+// 		} else {
+// 			fmt.Printf("Closing: %v\n", c.ID)
+// 		}
+// 	}
+// }
 
-func (p *Pool) ScheduledCleanup(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second)
+// func (p *Pool) ScheduledCleanup(ctx context.Context) {
+// 	ticker := time.NewTicker(2 * time.Second)
 
-	go func() {
-		for {
-			<-ticker.C
-			fmt.Println("Ticked, cleaning...")
-			p.Clean()
-		}
-	}()
+// 	go func() {
+// 		for {
+// 			<-ticker.C
+// 			fmt.Println("Ticked, cleaning...")
+// 			p.Clean()
+// 		}
+// 	}()
 
-}
+// }
 
 /*
 INTERCEPTORS

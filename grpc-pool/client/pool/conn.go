@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"grpc_client/pool/states"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,24 +13,21 @@ import (
 
 type Conn struct {
 	*grpc.ClientConn
-	Mtx      sync.Mutex
-	PoolRef  *Pool
 	ID       uuid.UUID
 	active   atomic.Int32
-	timeout  time.Duration
 	state    atomic.Int32
 	lastUsed atomic.Int64
+	Timeout  time.Duration
 }
 
-const idleThreshold = time.Duration(30 * time.Second)
+// const idleThreshold = time.Duration(30 * time.Second)
 
 /*
 CONNECTION LIFECYCLE
 */
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-	defer c.PoolRef.Release(c)
 
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 
 	go func() {
 		<-ctx.Done()
@@ -39,13 +35,9 @@ func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, o
 	}()
 
 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
-
-	// return c.PoolRef.Invoke(ctx, method, args, reply, opts...)
 }
 
 func (c *Conn) touch() error {
-	c.Mtx.Lock()
-	defer c.Mtx.Unlock()
 
 	if c.state.Load() >= states.CLOSING {
 		return fmt.Errorf("conn is closing")
@@ -58,12 +50,12 @@ func (c *Conn) touch() error {
 	return nil
 }
 
-func (c *Conn) isIdle() bool {
-	lastUsed := time.Unix(0, c.lastUsed.Load())
-	elapsed := time.Since(lastUsed)
+// func (c *Conn) isIdle() bool {
+// 	lastUsed := time.Unix(0, c.lastUsed.Load())
+// 	elapsed := time.Since(lastUsed)
 
-	return elapsed > idleThreshold && c.active.Load() > -1
-}
+// 	return elapsed > idleThreshold && c.active.Load() > -1
+// }
 
 func (c *Conn) canAccept(maxPerRpc int) bool {
 	if c.state.Load() >= states.CLOSING {
@@ -73,16 +65,14 @@ func (c *Conn) canAccept(maxPerRpc int) bool {
 	return c.active.Load() < int32(maxPerRpc)
 }
 
-func (c *Conn) safeClose() error {
-	c.Mtx.Lock()
-	defer c.Mtx.Unlock()
+// func (c *Conn) safeClose() error {
 
-	fmt.Println("trying co safe close...")
-	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
-		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
-	}
+// 	fmt.Println("trying co safe close...")
+// 	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
+// 		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
+// 	}
 
-	_ = c.ClientConn.Close()
-	c.state.Store(states.CLOSED)
-	return nil
-}
+// 	_ = c.ClientConn.Close()
+// 	c.state.Store(states.CLOSED)
+// 	return nil
+// }

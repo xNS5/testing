@@ -19,27 +19,23 @@ func GetPool() (*pool.Pool, func(), error) {
 
 	// ctx := context.Background()
 
-	if Pool != nil {
-		return Pool, nil, nil
+	target := "localhost:5050"
+
+	poolConfig := &pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    5,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(10 * time.Second),
 	}
 
-	poolConfig := &pool.Pool{
-		Target:     "localhost:5050",
-		Timeout:    time.Duration(10 * time.Second),
-		RPCTimeout: time.Duration(4 * time.Second),
-		Opts: []grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		},
-		MaxConns:   10,
-		MaxPerConn: 2,
-	}
+	fmt.Println("Initializing gRPC Pool")
 
-	// fmt.Println("Initializing gRPC Pool")
-	pool, err := pool.NewPool(poolConfig)
+	pool, err := pool.NewPool(target, poolConfig)
 
 	if err != nil {
 		fmt.Println("Error initializing grpc pool")
-		return nil, nil, err
 	}
 
 	Pool = pool
