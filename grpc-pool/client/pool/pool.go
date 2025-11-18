@@ -103,14 +103,14 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	return best, nil
 }
 
-func (p *Pool) Release(c *Conn) {
-	curr_load := c.active.Load()
-	if curr_load > 0 {
-		c.active.Add(-1)
-	} else if curr_load == 0 {
-		c.state.CompareAndSwap(states.ALIVE, states.IDLE)
-	}
-}
+// func (p *Pool) Release(c *Conn) {
+// 	curr_load := c.active.Load()
+// 	if curr_load > 0 {
+// 		c.active.Add(-1)
+// 	} else if curr_load == 0 {
+// 		c.state.CompareAndSwap(states.ALIVE, states.IDLE)
+// 	}
+// }
 
 // func (p *Pool) Clean() {
 // 	if !p.Mtx.TryLock() {
