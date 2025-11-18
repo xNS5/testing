@@ -68,6 +68,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	var best *Conn
 
 	for i := range p.Cfg.MaxConns {
+		// Early exit condition to avoid iterating through the entire array
 		if c := p.Conns[i]; c == nil {
 			break
 		} else if c.canAccept(p.Cfg.MinConns) {
