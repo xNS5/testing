@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"grpc_client/pool/states"
+	"sync/atomic"
 
 	"sync"
 	"time"
@@ -17,12 +18,13 @@ type Pool struct {
 	Conns    []*Conn
 	Target   string
 	Cfg      *PoolConfig
-	CurrLoad int
+	CurrLoad atomic.Int64
 }
 
 type PoolConfig struct {
 	MinConns      int
 	MaxConns      int
+	MaxPerConn    int
 	Opts          []grpc.DialOption
 	IdleTimeout   time.Duration
 	PruneInterval time.Duration
@@ -55,9 +57,10 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		Conns:  make([]*Conn, cfg.MaxConns),
 	}
 
-	for i := range cfg.MinConns {
+	for i := 0; i < cfg.MinConns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
+			pool.CurrLoad.Add(1)
 		}
 	}
 
@@ -67,11 +70,10 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	var best *Conn
 
-	for i := range p.Cfg.MaxConns {
+	for i := range p.CurrLoad.Load() {
 		// Early exit condition to avoid iterating through the entire array
-		if c := p.Conns[i]; c == nil {
-			break
-		} else if c.canAccept(p.Cfg.MinConns) {
+		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxPerConn) {
+
 			fmt.Println("Found best connection", c.ID)
 			best = c
 			break
@@ -79,24 +81,21 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	}
 
 	if best == nil {
-		if p.CurrLoad < p.Cfg.MaxConns {
+		if p.CurrLoad.Load() < int64(p.Cfg.MaxConns) {
 			conn, err := NewClient(p)
 			if err != nil {
 				return nil, err
 			}
-
 			best = conn
 
 			fmt.Println("Connection full, creating new client", conn.ID)
-
 			p.Mtx.Lock()
-			p.Conns[p.CurrLoad-1] = best
+			p.Conns[p.CurrLoad.Load()] = best
 			p.Mtx.Unlock()
-
+			p.CurrLoad.Add(1)
 		} else {
 			return nil, fmt.Errorf("pool is at capacity")
 		}
-
 	}
 
 	best.touch()

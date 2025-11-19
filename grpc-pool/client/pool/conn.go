@@ -14,10 +14,10 @@ import (
 type Conn struct {
 	*grpc.ClientConn
 	ID       uuid.UUID
+	Timeout  time.Duration
 	active   atomic.Int32
 	state    atomic.Int32
 	lastUsed atomic.Int64
-	Timeout  time.Duration
 }
 
 // const idleThreshold = time.Duration(30 * time.Second)
@@ -27,6 +27,7 @@ CONNECTION LIFECYCLE
 */
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 
+	c.state.Store(states.ALIVE)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 
 	go func() {
@@ -45,7 +46,6 @@ func (c *Conn) touch() error {
 
 	c.active.Add(1)
 	c.lastUsed.Store(time.Now().UnixNano())
-	c.state.Swap(states.ALIVE)
 
 	return nil
 }
@@ -58,6 +58,7 @@ func (c *Conn) touch() error {
 // }
 
 func (c *Conn) canAccept(maxPerRpc int) bool {
+
 	if c.state.Load() >= states.CLOSING {
 		return false
 	}

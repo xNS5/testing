@@ -2,9 +2,13 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	proto "grpc_client/protobuf"
 	"os"
+	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -50,148 +54,93 @@ TestTimeout
 Tests whether the RPC connection times out within the duration set in the pool
 Note: Server should also time out, interrupting any blocking requests (in theory)
 */
-// func TestTimeout(t *testing.T) {
+func TestTimeout(t *testing.T) {
 
-// 	ctx := context.Background()
+	ctx := context.Background()
 
-// 	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool()
 
-// 	defer Reset()
+	defer Reset()
 
-// 	if err != nil {
-// 		t.Errorf("Error getting gRPC pool: %v", err)
-// 		os.Exit(-1)
-// 	}
+	if err != nil {
+		t.Errorf("Error getting gRPC pool: %v", err)
+		os.Exit(-1)
+	}
 
-// 	conn, err := pool.Get(ctx)
+	conn, err := pool.Get(ctx)
 
-// 	if err != nil {
-// 		t.Errorf("Error getting connection: %v", err)
-// 		os.Exit(-1)
-// 	}
+	if err != nil {
+		t.Errorf("Error getting connection: %v", err)
+		os.Exit(-1)
+	}
 
-// 	client := proto.NewHelloClient(conn)
+	client := proto.NewHelloClient(conn)
 
-// 	timeout := int32(10)
+	timeout := int32(10)
 
-// 	_, err = client.Hello(ctx, &proto.Request{
-// 		Timeout: &timeout,
-// 	})
+	_, err = client.Hello(ctx, &proto.Request{
+		Timeout: &timeout,
+	})
 
-// 	assert.NotNil(t, err)
-// }
-
-/*
-TestNewConn
-Tests filling up a conn with multiplexed requests, should create new server connection in the pool
-*/
-// func TestNewConn(t *testing.T) {
-
-// 	ctx := context.Background()
-
-// 	pool, Reset, err := GetPool()
-
-// 	defer Reset()
-
-// 	if err != nil {
-// 		t.Errorf("Error getting gRPC pool: %v", err)
-// 		os.Exit(-1)
-// 	}
-
-// 	var wg sync.WaitGroup
-
-// 	reqs := 4
-// 	// In theory, 2 connections total
-
-// 	wg.Add(reqs)
-
-// 	for i := range reqs {
-// 		go func() {
-// 			defer wg.Done()
-// 			conn, err := pool.Get(ctx)
-
-// 			if err != nil {
-// 				t.Errorf("Error getting connection: %v", err)
-// 				os.Exit(-1)
-// 			}
-
-// 			client := proto.NewHelloClient(conn)
-
-// 			msg := fmt.Sprintf("Test New Conn %v", i)
-
-// 			res, err := client.Hello(ctx, &proto.Request{
-// 				Msg: &msg,
-// 			})
-
-// 			if err != nil {
-// 				t.Errorf("hello request error: %v", err)
-// 				os.Exit(-1)
-// 			}
-
-// 			if res.Res != msg {
-// 				t.Errorf("hello request error: %v", err)
-// 				os.Exit(-1)
-// 			}
-
-// 		}()
-// 	}
-// 	wg.Wait()
-
-// 	assert.Equal(t, 2, len(pool.Conns))
-// }
+	assert.NotNil(t, err)
+}
 
 /*
 TestConcurrentGet
 Tests running n connection requests concurrently to the server.
 Expected result: the pool creates ( numConns // numPerCon ) connections
 */
+func TestConcurrentGet(t *testing.T) {
 
-// func TestConcurrentGet(t *testing.T) {
-// 	ctx := context.Background()
+	ctx := context.Background()
 
-// 	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool()
 
-// 	defer Reset()
+	defer Reset()
 
-// 	if err != nil {
-// 		t.Errorf("Error getting gRPC pool: %v", err)
-// 		os.Exit(-1)
-// 	}
+	if err != nil {
+		t.Errorf("Error getting gRPC pool: %v", err)
+		os.Exit(-1)
+	}
 
-// 	var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-// 	for i := range 4 {
-// 		conn, err := pool.Get(ctx)
+	reqs := 4
+	// In theory, 2 connections total
 
-// 		if err != nil {
-// 			t.Errorf("Error getting connection: %v", err)
-// 			os.Exit(-1)
-// 		}
+	wg.Add(reqs)
 
-// 		client := proto.NewHelloClient(conn)
+	for i := range reqs {
+		go func() {
+			defer wg.Done()
+			conn, err := pool.Get(ctx)
 
-// 		wg.Go(func() {
+			if err != nil {
+				t.Errorf("Error getting connection: %v", err)
+				os.Exit(-1)
+			}
 
-// 			msg := fmt.Sprintf("Test New Conn %v", i)
-// 			timeout := int32(5)
+			client := proto.NewHelloClient(conn)
 
-// 			res, err := client.Hello(ctx, &proto.Request{
-// 				Msg:     &msg,
-// 				Timeout: &timeout,
-// 			})
+			msg := fmt.Sprintf("Test New Conn %v", i)
 
-// 			if err != nil {
-// 				t.Errorf("hello request error: %v", err)
-// 				os.Exit(-1)
-// 			}
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg: &msg,
+			})
 
-// 			if res.Res != msg {
-// 				t.Errorf("hello request error: %v", err)
-// 				os.Exit(-1)
-// 			}
-// 		})
-// 	}
+			if err != nil {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
 
-// 	wg.Wait()
-// 	assert.Equal(t, 2, len(pool.Conns))
-// }
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
+
+		}()
+	}
+	wg.Wait()
+
+	// assert.Equal(t, 2, len(pool.Conns))
+}

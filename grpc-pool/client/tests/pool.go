@@ -24,10 +24,11 @@ func GetPool() (*pool.Pool, func(), error) {
 	poolConfig := &pool.PoolConfig{
 		MinConns:    1,
 		MaxConns:    5,
+		MaxPerConn:  2,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
 		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(2 * time.Second),
 	}
 
 	fmt.Println("Initializing gRPC Pool")
