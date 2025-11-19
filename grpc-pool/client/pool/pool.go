@@ -60,9 +60,10 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	for i := 0; i < cfg.MinConns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
-			pool.CurrLoad.Add(1)
 		}
 	}
+
+	pool.CurrLoad.Store(int64(cfg.MinConns))
 
 	return pool, nil
 }
@@ -91,8 +92,12 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 			fmt.Println("Connection full, creating new client", conn.ID)
 			p.Mtx.Lock()
 			p.Conns[p.CurrLoad.Load()] = best
+
+			if p.CurrLoad.Load() >= int64(p.Cfg.MinConns) {
+				p.CurrLoad.Add(1)
+			}
+
 			p.Mtx.Unlock()
-			p.CurrLoad.Add(1)
 		} else {
 			return nil, fmt.Errorf("pool is at capacity")
 		}

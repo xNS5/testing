@@ -142,5 +142,69 @@ func TestConcurrentGet(t *testing.T) {
 	}
 	wg.Wait()
 
-	// assert.Equal(t, 2, len(pool.Conns))
+	assert.Equal(t, 2, int(pool.CurrLoad.Load()))
+}
+
+/*
+TestConcurrentGetOverflow
+Tests running n connection requests concurrently to the server.
+Expected result: the pool creates ( numConns // numPerCon ) connections
+*/
+func TestConcurrentGetOverflow(t *testing.T) {
+
+	ctx := context.Background()
+
+	pool, Reset, err := GetPool()
+
+	defer Reset()
+
+	if err != nil {
+		t.Errorf("Error getting gRPC pool: %v", err)
+		os.Exit(-1)
+	}
+
+	var wg sync.WaitGroup
+
+	reqs := 12
+	// In theory, 5 connections and 2 rejected request (because math)
+
+	wg.Add(reqs)
+
+	NumErrors := 0
+
+	for i := range reqs {
+		go func() {
+			defer wg.Done()
+			conn, err := pool.Get(ctx)
+
+			if err != nil {
+				fmt.Printf("Error getting connection: %v\r\n", err)
+				NumErrors += 1
+				return
+			}
+
+			client := proto.NewHelloClient(conn)
+
+			msg := fmt.Sprintf("Test New Conn %v", i)
+
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg: &msg,
+			})
+
+			if err != nil {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
+
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				os.Exit(-1)
+			}
+
+		}()
+	}
+
+	wg.Wait()
+
+	assert.Equal(t, 2, NumErrors)
 }
