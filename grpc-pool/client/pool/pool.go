@@ -74,7 +74,6 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	for i := range p.CurrLoad.Load() {
 		// Early exit condition to avoid iterating through the entire array
 		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxPerConn) {
-
 			fmt.Println("Found best connection", c.ID)
 			best = c
 			break
@@ -90,12 +89,12 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 			best = conn
 
 			fmt.Println("Connection full, creating new client", conn.ID)
-			p.Mtx.Lock()
 			p.Conns[p.CurrLoad.Load()] = best
+			p.Mtx.Lock()
 
-			if p.CurrLoad.Load() >= int64(p.Cfg.MinConns) {
-				p.CurrLoad.Add(1)
-			}
+			// if p.CurrLoad.Load() > int64(p.Cfg.MinConns) {
+			p.CurrLoad.Add(1)
+			// }
 
 			p.Mtx.Unlock()
 		} else {

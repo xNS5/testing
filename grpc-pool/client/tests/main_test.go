@@ -3,12 +3,16 @@ package tests
 import (
 	"context"
 	"fmt"
+	"grpc_client/pool"
 	proto "grpc_client/protobuf"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 /*
@@ -19,7 +23,15 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool(&pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    1,
+		MaxPerConn:  2,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(2 * time.Second),
+	})
 
 	defer Reset()
 
@@ -58,7 +70,15 @@ func TestTimeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool(&pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    1,
+		MaxPerConn:  2,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(2 * time.Second),
+	})
 
 	defer Reset()
 
@@ -94,7 +114,15 @@ func TestConcurrentGet(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool(&pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    2,
+		MaxPerConn:  2,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(2 * time.Second),
+	})
 
 	defer Reset()
 
@@ -154,7 +182,15 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool()
+	pool, Reset, err := GetPool(&pool.PoolConfig{
+		MinConns:    1,
+		MaxConns:    5,
+		MaxPerConn:  2,
+		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		IdleTimeout: time.Duration(10 * time.Second),
+		DialTimeout: time.Duration(10 * time.Second),
+		ReqTimeout:  time.Duration(10 * time.Second),
+	})
 
 	defer Reset()
 
@@ -172,9 +208,12 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	NumErrors := 0
 
+	timeout := int32(5)
+
 	for i := range reqs {
 		go func() {
 			defer wg.Done()
+
 			conn, err := pool.Get(ctx)
 
 			if err != nil {
@@ -188,7 +227,8 @@ func TestConcurrentGetOverflow(t *testing.T) {
 			msg := fmt.Sprintf("Test New Conn %v", i)
 
 			res, err := client.Hello(ctx, &proto.Request{
-				Msg: &msg,
+				Timeout: &timeout,
+				Msg:     &msg,
 			})
 
 			if err != nil {
