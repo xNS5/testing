@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"fmt"
 	"grpc_client/pool/states"
 	"sync/atomic"
 	"time"
@@ -13,11 +12,10 @@ import (
 
 type Conn struct {
 	*grpc.ClientConn
-	ID       uuid.UUID
-	Timeout  time.Duration
-	active   atomic.Int32
-	state    atomic.Int32
-	lastUsed atomic.Int64
+	ID      uuid.UUID
+	timeout time.Duration
+	active  atomic.Int32
+	state   atomic.Int32
 }
 
 // const idleThreshold = time.Duration(30 * time.Second)
@@ -28,7 +26,10 @@ CONNECTION LIFECYCLE
 func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 
 	c.state.Store(states.ALIVE)
-	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+
+	c.active.Add(1)
+	defer c.release()
 
 	go func() {
 		<-ctx.Done()
@@ -38,42 +39,17 @@ func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, o
 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
 }
 
-func (c *Conn) touch() error {
-
-	if c.state.Load() >= states.CLOSING {
-		return fmt.Errorf("conn is closing")
+func (c *Conn) release() error {
+	if c.active.Load() > 0 {
+		c.active.Add(-1)
 	}
-
-	c.active.Add(1)
-	c.lastUsed.Store(time.Now().UnixNano())
-
 	return nil
 }
 
-// func (c *Conn) isIdle() bool {
-// 	lastUsed := time.Unix(0, c.lastUsed.Load())
-// 	elapsed := time.Since(lastUsed)
-
-// 	return elapsed > idleThreshold && c.active.Load() > -1
-// }
-
 func (c *Conn) canAccept(maxPerRpc int) bool {
-
-	if c.state.Load() >= states.CLOSING {
-		return false
-	}
-
 	return c.active.Load() < int32(maxPerRpc)
 }
 
-// func (c *Conn) safeClose() error {
+func (c *Conn) touch() {
 
-// 	fmt.Println("trying co safe close...")
-// 	if !c.isIdle() && !c.state.CompareAndSwap(states.CLOSING, states.CLOSED) /* && !c.state.CompareAndSwap(states.ALIVE, states.CLOSING) */ {
-// 		return fmt.Errorf("unable to change conn state to closing: %v", c.state.Load())
-// 	}
-
-// 	_ = c.ClientConn.Close()
-// 	c.state.Store(states.CLOSED)
-// 	return nil
-// }
+}

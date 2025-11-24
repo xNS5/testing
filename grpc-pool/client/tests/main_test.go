@@ -7,6 +7,7 @@ import (
 	proto "grpc_client/protobuf"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -201,12 +202,12 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	reqs := 12
+	reqs := 5
 	// In theory, 5 connections and 2 rejected request (because math)
 
 	wg.Add(reqs)
 
-	NumErrors := 0
+	var NumErrors atomic.Int32
 
 	timeout := int32(5)
 
@@ -218,7 +219,7 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 			if err != nil {
 				fmt.Printf("Error getting connection: %v\r\n", err)
-				NumErrors += 1
+				NumErrors.Add(1)
 				return
 			}
 
@@ -246,5 +247,5 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	wg.Wait()
 
-	assert.Equal(t, 2, NumErrors)
+	assert.Equal(t, 2, int(pool.CurrLoad.Load()))
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"grpc_client/pool/states"
-	"sync/atomic"
 
 	"sync"
 	"time"
@@ -14,22 +13,19 @@ import (
 )
 
 type Pool struct {
-	Mtx      sync.Mutex
-	Conns    []*Conn
-	Target   string
-	Cfg      *PoolConfig
-	CurrLoad atomic.Int64
+	Mtx    sync.Mutex
+	Conns  []*Conn
+	Target string
+	Cfg    *PoolConfig
 }
 
 type PoolConfig struct {
-	MinConns      int
-	MaxConns      int
-	MaxPerConn    int
-	Opts          []grpc.DialOption
-	IdleTimeout   time.Duration
-	PruneInterval time.Duration
-	DialTimeout   time.Duration
-	ReqTimeout    time.Duration
+	NumConns    int
+	MaxPerConn  int
+	Opts        []grpc.DialOption
+	IdleTimeout time.Duration
+	DialTimeout time.Duration
+	ReqTimeout  time.Duration
 }
 
 func NewClient(pool *Pool) (*Conn, error) {
@@ -47,32 +43,30 @@ func NewClient(pool *Pool) (*Conn, error) {
 }
 
 func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
-	if cfg.MaxConns < 1 {
+	if cfg.NumConns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
 	pool := &Pool{
 		Target: target,
 		Cfg:    cfg,
-		Conns:  make([]*Conn, cfg.MaxConns),
+		Conns:  make([]*Conn, cfg.NumConns),
 	}
 
-	for i := 0; i < cfg.MinConns; i++ {
+	for i := 0; i < cfg.NumConns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
 		}
 	}
 
-	pool.CurrLoad.Store(int64(cfg.MinConns))
-
 	return pool, nil
 }
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
+
 	var best *Conn
 
-	for i := range p.CurrLoad.Load() {
-		// Early exit condition to avoid iterating through the entire array
+	for i := range len(p.Conns) {
 		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxPerConn) {
 			fmt.Println("Found best connection", c.ID)
 			best = c
@@ -81,95 +75,11 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	}
 
 	if best == nil {
-		if p.CurrLoad.Load() < int64(p.Cfg.MaxConns) {
-			conn, err := NewClient(p)
-			if err != nil {
-				return nil, err
-			}
-			best = conn
-
-			fmt.Println("Connection full, creating new client", conn.ID)
-			p.Conns[p.CurrLoad.Load()] = best
-			p.Mtx.Lock()
-
-			// if p.CurrLoad.Load() > int64(p.Cfg.MinConns) {
-			p.CurrLoad.Add(1)
-			// }
-
-			p.Mtx.Unlock()
-		} else {
-			return nil, fmt.Errorf("pool is at capacity")
-		}
+		return nil, fmt.Errorf("")
 	}
-
-	best.touch()
 
 	return best, nil
 }
-
-// func (p *Pool) Release(c *Conn) {
-// 	curr_load := c.active.Load()
-// 	if curr_load > 0 {
-// 		c.active.Add(-1)
-// 	} else if curr_load == 0 {
-// 		c.state.CompareAndSwap(states.ALIVE, states.IDLE)
-// 	}
-// }
-
-// func (p *Pool) Clean() {
-// 	if !p.Mtx.TryLock() {
-// 		return
-// 	}
-// 	defer p.Mtx.Unlock()
-
-// 	if len(p.Conns) == 0 {
-// 		fmt.Println("No connections, skipping...")
-// 		return
-// 	} else {
-// 		fmt.Println("Beginning cleanup")
-// 	}
-
-// 	alive_conns := make([]*Conn, 0, len(p.Conns))
-// 	to_close := make(chan *Conn)
-
-// 	for i, c := range p.Conns {
-// 		if i == 0 || !c.isIdle() {
-// 			alive_conns = append(alive_conns, c)
-// 			fmt.Printf("Keeping: %v\n", c.ID)
-// 		}
-
-// 		if c.state.CompareAndSwap(states.IDLE, states.CLOSING) {
-// 			fmt.Println("Closing ", c.ID)
-// 			to_close <- c
-// 		}
-// 	}
-
-// 	close(to_close)
-
-// 	p.Conns = alive_conns
-
-// 	for c := range to_close {
-// 		fmt.Println(c.ID)
-// 		if err := c.safeClose(); err != nil {
-// 			fmt.Printf("Unable to safe close: %v\n", err)
-// 		} else {
-// 			fmt.Printf("Closing: %v\n", c.ID)
-// 		}
-// 	}
-// }
-
-// func (p *Pool) ScheduledCleanup(ctx context.Context) {
-// 	ticker := time.NewTicker(2 * time.Second)
-
-// 	go func() {
-// 		for {
-// 			<-ticker.C
-// 			fmt.Println("Ticked, cleaning...")
-// 			p.Clean()
-// 		}
-// 	}()
-
-// }
 
 /*
 INTERCEPTORS
