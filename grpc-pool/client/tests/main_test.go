@@ -25,8 +25,6 @@ func TestConnection(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MinConns:    1,
-		MaxConns:    1,
 		MaxPerConn:  2,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
@@ -72,8 +70,6 @@ func TestTimeout(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MinConns:    1,
-		MaxConns:    1,
 		MaxPerConn:  2,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
@@ -116,8 +112,6 @@ func TestConcurrentGet(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MinConns:    1,
-		MaxConns:    2,
 		MaxPerConn:  2,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
@@ -170,8 +164,6 @@ func TestConcurrentGet(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-
-	assert.Equal(t, 2, int(pool.CurrLoad.Load()))
 }
 
 /*
@@ -184,8 +176,6 @@ func TestConcurrentGetOverflow(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MinConns:    1,
-		MaxConns:    5,
 		MaxPerConn:  2,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
@@ -247,5 +237,5 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	wg.Wait()
 
-	assert.Equal(t, 2, int(pool.CurrLoad.Load()))
+	assert.Equal(t, 2, NumErrors)
 }

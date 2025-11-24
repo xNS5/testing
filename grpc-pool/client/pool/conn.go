@@ -14,6 +14,7 @@ type Conn struct {
 	*grpc.ClientConn
 	ID      uuid.UUID
 	timeout time.Duration
+	last_used atomic.Int64
 	active  atomic.Int32
 	state   atomic.Int32
 }
@@ -30,6 +31,8 @@ func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, o
 
 	c.active.Add(1)
 	defer c.release()
+
+	c.touch()
 
 	go func() {
 		<-ctx.Done()
@@ -51,5 +54,5 @@ func (c *Conn) canAccept(maxPerRpc int) bool {
 }
 
 func (c *Conn) touch() {
-
+	c.last_used.Store(time.Now().Unix())
 }

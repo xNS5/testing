@@ -15,8 +15,6 @@ func main() {
 	target := "localhost:5050"
 
 	poolConfig := &pool.PoolConfig{
-		MinConns:    1,
-		MaxConns:    5,
 		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		IdleTimeout: time.Duration(10 * time.Second),
 		DialTimeout: time.Duration(10 * time.Second),

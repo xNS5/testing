@@ -34,7 +34,7 @@ func NewClient(pool *Pool) (*Conn, error) {
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
-		Timeout:    pool.Cfg.ReqTimeout,
+		timeout:    pool.Cfg.ReqTimeout,
 	}
 
 	newConn.state.Store(states.IDLE)
