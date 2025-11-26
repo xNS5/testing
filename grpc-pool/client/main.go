@@ -15,10 +15,8 @@ func main() {
 	target := "localhost:5050"
 
 	poolConfig := &pool.PoolConfig{
-		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		IdleTimeout: time.Duration(10 * time.Second),
-		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(10 * time.Second),
+		Opts:       []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		ReqTimeout: time.Duration(10 * time.Second),
 	}
 
 	fmt.Println("Initializing gRPC Pool")

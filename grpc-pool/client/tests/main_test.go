@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"grpc_client/pool"
 	proto "grpc_client/protobuf"
@@ -24,12 +25,31 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
+	service_config := map[string]any{
+		"retryPolicy": map[string]any{
+			"maxAttempts":          4,
+			"initialBackoff":       "0.5s",
+			"maxBackoff":           "4s",
+			"backoffMultiplier":    2,
+			"retryableStatusCodes": []string{"UNAVAILABLE"},
+		},
+	}
+
+	data, err := json.Marshal(service_config)
+
+	if err != nil {
+		t.Errorf("error marshaling retry policy config")
+		os.Exit(-1)
+	}
+
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MaxPerConn:  2,
-		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		IdleTimeout: time.Duration(10 * time.Second),
-		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(2 * time.Second),
+		Conns:         2,
+		MaxReqPerConn: 2,
+		Opts: []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultServiceConfig(string(data)),
+		},
+		ReqTimeout: time.Duration(2 * time.Second),
 	})
 
 	defer Reset()
@@ -70,11 +90,9 @@ func TestTimeout(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MaxPerConn:  2,
-		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		IdleTimeout: time.Duration(10 * time.Second),
-		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(2 * time.Second),
+		MaxReqPerConn: 2,
+		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		ReqTimeout:    time.Duration(2 * time.Second),
 	})
 
 	defer Reset()
@@ -112,11 +130,9 @@ func TestConcurrentGet(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MaxPerConn:  2,
-		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		IdleTimeout: time.Duration(10 * time.Second),
-		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(2 * time.Second),
+		MaxReqPerConn: 2,
+		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		ReqTimeout:    time.Duration(2 * time.Second),
 	})
 
 	defer Reset()
@@ -176,11 +192,9 @@ func TestConcurrentGetOverflow(t *testing.T) {
 	ctx := context.Background()
 
 	pool, Reset, err := GetPool(&pool.PoolConfig{
-		MaxPerConn:  2,
-		Opts:        []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-		IdleTimeout: time.Duration(10 * time.Second),
-		DialTimeout: time.Duration(10 * time.Second),
-		ReqTimeout:  time.Duration(10 * time.Second),
+		MaxReqPerConn: 2,
+		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		ReqTimeout:    time.Duration(10 * time.Second),
 	})
 
 	defer Reset()
@@ -237,5 +251,5 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	wg.Wait()
 
-	assert.Equal(t, 2, NumErrors)
+	assert.Equal(t, 2, NumErrors.Load())
 }

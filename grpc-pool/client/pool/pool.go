@@ -20,12 +20,10 @@ type Pool struct {
 }
 
 type PoolConfig struct {
-	NumConns    int
-	MaxPerConn  int
-	Opts        []grpc.DialOption
-	IdleTimeout time.Duration
-	DialTimeout time.Duration
-	ReqTimeout  time.Duration
+	Conns         int
+	MaxReqPerConn int
+	Opts          []grpc.DialOption
+	ReqTimeout    time.Duration
 }
 
 func NewClient(pool *Pool) (*Conn, error) {
@@ -43,17 +41,17 @@ func NewClient(pool *Pool) (*Conn, error) {
 }
 
 func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
-	if cfg.NumConns < 1 {
+	if cfg.Conns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
 	pool := &Pool{
 		Target: target,
 		Cfg:    cfg,
-		Conns:  make([]*Conn, cfg.NumConns),
+		Conns:  make([]*Conn, cfg.Conns),
 	}
 
-	for i := 0; i < cfg.NumConns; i++ {
+	for i := 0; i < cfg.Conns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
 		}
@@ -67,7 +65,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	var best *Conn
 
 	for i := range len(p.Conns) {
-		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxPerConn) {
+		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxReqPerConn) {
 			fmt.Println("Found best connection", c.ID)
 			best = c
 			break
@@ -75,7 +73,7 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	}
 
 	if best == nil {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("pool at capacity")
 	}
 
 	return best, nil
