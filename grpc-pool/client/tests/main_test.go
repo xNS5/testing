@@ -26,12 +26,15 @@ func TestConnection(t *testing.T) {
 	ctx := context.Background()
 
 	service_config := map[string]any{
-		"retryPolicy": map[string]any{
-			"maxAttempts":          4,
-			"initialBackoff":       "0.5s",
-			"maxBackoff":           "4s",
-			"backoffMultiplier":    2,
-			"retryableStatusCodes": []string{"UNAVAILABLE"},
+		"methodConfig": map[string]any{
+			"name": []map[string]string{},
+			"retryPolicy": map[string]any{
+				"maxAttempts":          "4",
+				"initialBackoff":       "2s",
+				"maxBackoff":           "4s",
+				"backoffMultiplier":    2,
+				"retryableStatusCodes": []string{"UNAVAILABLE"},
+			},
 		},
 	}
 
@@ -42,7 +45,7 @@ func TestConnection(t *testing.T) {
 		os.Exit(-1)
 	}
 
-	pool, Reset, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&pool.PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts: []grpc.DialOption{
@@ -51,8 +54,6 @@ func TestConnection(t *testing.T) {
 		},
 		ReqTimeout: time.Duration(2 * time.Second),
 	})
-
-	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -89,13 +90,11 @@ func TestTimeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&pool.PoolConfig{
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
 	})
-
-	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -129,13 +128,11 @@ func TestConcurrentGet(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&pool.PoolConfig{
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
 	})
-
-	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -191,13 +188,11 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, Reset, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&pool.PoolConfig{
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(10 * time.Second),
 	})
-
-	defer Reset()
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)

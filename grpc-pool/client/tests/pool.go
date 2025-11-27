@@ -7,11 +7,7 @@ import (
 
 var Pool *pool.Pool
 
-func Reset() {
-	Pool = nil
-}
-
-func GetPool(config *pool.PoolConfig) (*pool.Pool, func(), error) {
+func GetPool(config *pool.PoolConfig) (*pool.Pool, error) {
 
 	// ctx := context.Background()
 
@@ -29,5 +25,5 @@ func GetPool(config *pool.PoolConfig) (*pool.Pool, func(), error) {
 
 	// go pool.ScheduledCleanup(ctx)
 
-	return pool, Reset, nil
+	return pool, nil
 }
