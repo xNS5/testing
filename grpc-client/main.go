@@ -1,46 +1,54 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	proto "grpc-client/proto"
-	"io"
 	"log"
-	"os"
-	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	file, err := os.Open("/home/michael/Downloads/Sparky/203398809_10215736609888198_4937431234587046278_n.jpg")
+	// file, err := os.Open("/home/michael/Downloads/Sparky/203398809_10215736609888198_4937431234587046278_n.jpg")
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	defer file.Close()
+	// defer file.Close()
 
-	stat, err := file.Stat()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// stat, err := file.Stat()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	bs := make([]byte, stat.Size())
-	_, err = bufio.NewReader(file).Read(bs)
-	if err != nil && err != io.EOF {
-		fmt.Println(err)
-		return
-	}
+	// bs := make([]byte, stat.Size())
+	// _, err = bufio.NewReader(file).Read(bs)
+	// if err != nil && err != io.EOF {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	start := time.Now()
+	// start := time.Now()
 
-	var opts []grpc.DialOption
+	// var opts []grpc.DialOption
 
-	opts = append(opts)
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{
+		"methodConfig": [{
+		  "name": [{}],
+		  "retryPolicy": {
+			  "maxAttempts": 4,
+			  "initialBackoff": "2s",
+			  "maxBackoff": "10s",
+			  "backoffMultiplier": 1.0,
+			  "retryableStatusCodes": [ "UNAVAILABLE" ]
+		  }
+		}]}`)}
 
 	conn, err := grpc.NewClient("localhost:5050", opts...)
 
@@ -52,23 +60,22 @@ func main() {
 
 	client := proto.NewScanImageClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-	defer cancel()
+	// defer cancel()
 
-	res, err := client.ScanImage(ctx, &proto.ScanImageRequest{
-		Id:    "hello",
-		User:  "bar",
-		Image: bs,
+	_, err = client.ScanImage(context.Background(), &proto.ScanImageRequest{
+		Id:   "hello",
+		User: "bar",
 	})
 
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 
-	elapsed := time.Since(start)
+	// elapsed := time.Since(start)
 
-	fmt.Println(elapsed)
+	// fmt.Println(elapsed)
 
-	fmt.Println(res)
+	// fmt.Println(res)
 }
