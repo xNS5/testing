@@ -29,6 +29,11 @@ type PoolConfig struct {
 func NewClient(pool *Pool) (*Conn, error) {
 	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
 
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
@@ -54,6 +59,8 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	for i := 0; i < cfg.Conns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
+		} else {
+			return nil, err
 		}
 	}
 

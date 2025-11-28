@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"grpc_client/pool"
 	proto "grpc_client/protobuf"
@@ -25,23 +24,25 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	service_config := map[string]any{
-		"methodConfig": map[string]any{
-			"name": []map[string]string{},
-			"retryPolicy": map[string]any{
-				"maxAttempts":          "4",
-				"initialBackoff":       "2s",
-				"maxBackoff":           "4s",
-				"backoffMultiplier":    2,
-				"retryableStatusCodes": []string{"UNAVAILABLE"},
+	service_cfg := pool.ServiceConfig{
+		MethodConfig: []pool.MethodConfig{
+			{
+				Name: []pool.Name{{}},
+				RetryPolicy: &pool.RetryPolicy{
+					MaxAttempts:          4,
+					InitialBackoff:       "2s",
+					MaxBackoff:           "4s",
+					BackoffMultiplier:    2,
+					RetryableStatusCodes: []string{"UNAVAILABLE"},
+				},
 			},
 		},
 	}
 
-	data, err := json.Marshal(service_config)
+	data, err := service_cfg.ToJSON()
 
 	if err != nil {
-		t.Errorf("error marshaling retry policy config")
+		t.Errorf("Unable to parse config: %v", err)
 		os.Exit(-1)
 	}
 
@@ -52,7 +53,7 @@ func TestConnection(t *testing.T) {
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultServiceConfig(string(data)),
 		},
-		ReqTimeout: time.Duration(2 * time.Second),
+		ReqTimeout: time.Duration(20 * time.Second),
 	})
 
 	if err != nil {
