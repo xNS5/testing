@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"grpc_client/pool/states"
+	"sync/atomic"
 
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ type Pool struct {
 	Mtx    sync.Mutex
 	Conns  []*Conn
 	Target string
+	Active atomic.Int64
 	Cfg    *PoolConfig
 }
 
@@ -37,6 +39,7 @@ func NewClient(pool *Pool) (*Conn, error) {
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
+		active_ref: &pool.Active,
 		timeout:    pool.Cfg.ReqTimeout,
 	}
 
@@ -59,6 +62,7 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	for i := 0; i < cfg.Conns; i++ {
 		if conn, err := NewClient(pool); err == nil {
 			pool.Conns[i] = conn
+			fmt.Println("Spinning up: ", conn.ID)
 		} else {
 			return nil, err
 		}
@@ -69,13 +73,19 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
+	if int(p.Active.Load()) > (p.Cfg.MaxReqPerConn * len(p.Conns)) {
+		return nil, fmt.Errorf("pool at capacity")
+	}
+
 	var best *Conn
 
 	for i := range len(p.Conns) {
 		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxReqPerConn) {
-			fmt.Println("Found best connection", c.ID)
+			fmt.Println("Found best connection:", c.ID)
 			best = c
 			break
+		} else {
+			fmt.Println("connection at capacity:", c.ID)
 		}
 	}
 

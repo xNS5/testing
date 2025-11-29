@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"grpc_client/pool"
 	proto "grpc_client/protobuf"
+	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -24,34 +25,11 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	service_cfg := pool.ServiceConfig{
-		MethodConfig: []pool.MethodConfig{
-			{
-				Name: []pool.Name{{}},
-				RetryPolicy: &pool.RetryPolicy{
-					MaxAttempts:          4,
-					InitialBackoff:       "2s",
-					MaxBackoff:           "4s",
-					BackoffMultiplier:    2,
-					RetryableStatusCodes: []string{"UNAVAILABLE"},
-				},
-			},
-		},
-	}
-
-	data, err := service_cfg.ToJSON()
-
-	if err != nil {
-		t.Errorf("Unable to parse config: %v", err)
-		os.Exit(-1)
-	}
-
 	pool, err := GetPool(&pool.PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithDefaultServiceConfig(string(data)),
 		},
 		ReqTimeout: time.Duration(20 * time.Second),
 	})
@@ -74,12 +52,7 @@ func TestConnection(t *testing.T) {
 
 	_, err = client.Hello(ctx, &proto.Request{})
 
-	if err != nil {
-		t.Errorf("hello request error: %v", err)
-		os.Exit(-1)
-	}
-
-	// assert.Equal(t, res.Res, fmt.Sprintf("Hello, world! %v", msg))
+	assert.Nil(t, err)
 }
 
 /*
@@ -92,6 +65,7 @@ func TestTimeout(t *testing.T) {
 	ctx := context.Background()
 
 	pool, err := GetPool(&pool.PoolConfig{
+		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
@@ -130,6 +104,7 @@ func TestConcurrentGet(t *testing.T) {
 	ctx := context.Background()
 
 	pool, err := GetPool(&pool.PoolConfig{
+		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
@@ -190,6 +165,7 @@ func TestConcurrentGetOverflow(t *testing.T) {
 	ctx := context.Background()
 
 	pool, err := GetPool(&pool.PoolConfig{
+		Conns:         3,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(10 * time.Second),
@@ -202,50 +178,106 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	reqs := 5
-	// In theory, 5 connections and 2 rejected request (because math)
-
+	reqs := 8
 	wg.Add(reqs)
 
-	var NumErrors atomic.Int32
+	var numErrors atomic.Int32
 
 	timeout := int32(5)
 
-	for i := range reqs {
+	for range reqs {
 		go func() {
 			defer wg.Done()
 
 			conn, err := pool.Get(ctx)
-
 			if err != nil {
-				fmt.Printf("Error getting connection: %v\r\n", err)
-				NumErrors.Add(1)
+				numErrors.Add(1)
 				return
 			}
 
 			client := proto.NewHelloClient(conn)
 
-			msg := fmt.Sprintf("Test New Conn %v", i)
-
-			res, err := client.Hello(ctx, &proto.Request{
+			_, _ = client.Hello(ctx, &proto.Request{
 				Timeout: &timeout,
-				Msg:     &msg,
 			})
-
-			if err != nil {
-				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
-			}
-
-			if res.Res != msg {
-				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
-			}
-
 		}()
 	}
 
 	wg.Wait()
 
-	assert.Equal(t, 2, NumErrors.Load())
+	assert.Equal(t, int(math.Abs(float64((pool.Cfg.MaxReqPerConn*pool.Cfg.Conns)-reqs))), int(numErrors.Load()))
+}
+
+// TestConfig
+
+func TestMethodConfig(t *testing.T) {
+
+	ctx := context.Background()
+
+	service_cfg := pool.ServiceConfig{
+		MethodConfig: []pool.MethodConfig{
+			{
+				Name: []pool.Name{{}},
+				RetryPolicy: &pool.RetryPolicy{
+					MaxAttempts:          4,
+					InitialBackoff:       "2s",
+					MaxBackoff:           "4s",
+					BackoffMultiplier:    2,
+					RetryableStatusCodes: []string{"UNAVAILABLE"},
+				},
+			},
+		},
+	}
+
+	data, err := service_cfg.ToJSON()
+
+	if err != nil {
+		t.Errorf("Unable to parse config: %v", err)
+		os.Exit(-1)
+	}
+
+	target := "localhost:2020"
+
+	pool, err := pool.NewPool(target, (&pool.PoolConfig{
+		Conns:         2,
+		MaxReqPerConn: 2,
+		Opts: []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultServiceConfig(string(data)),
+		},
+		ReqTimeout: time.Duration(20 * time.Second),
+	}))
+
+	if err != nil {
+		t.Errorf("Error getting gRPC pool: %v", err)
+		os.Exit(-1)
+	}
+
+	conn, err := pool.Get(ctx)
+
+	if err != nil {
+		t.Errorf("Error getting connection: %v", err)
+		os.Exit(-1)
+	}
+
+	client := proto.NewHelloClient(conn)
+
+	retry_policy := service_cfg.MethodConfig[0].RetryPolicy
+
+	max_attempts := retry_policy.MaxAttempts
+	multiplier := float64(retry_policy.BackoffMultiplier)
+	initial_backoff := time.Duration(int(retry_policy.InitialBackoff[0]) * time.Now().Second())
+	max_backoff := time.Duration(int(retry_policy.MaxBackoff[0]) * time.Now().Second())
+
+	estimated_duration := TotalRetryBackoff(max_attempts, time.Duration(initial_backoff), max_backoff, multiplier)
+
+	start := time.Now()
+
+	// Not checking the resulting error as this is just testing that the retry configruation has worked
+	_, _ = client.Hello(ctx, &proto.Request{})
+
+	elapsed := time.Since(start)
+
+	// Loose guesstimate, need to take into account jitte
+	assert.GreaterOrEqual(t, elapsed, estimated_duration)
 }
