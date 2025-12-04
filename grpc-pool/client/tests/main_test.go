@@ -126,6 +126,7 @@ func TestConcurrentGet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			conn, err := pool.Get(ctx)
+			defer conn.Release()
 
 			if err != nil {
 				t.Errorf("Error getting connection: %v", err)
@@ -190,7 +191,9 @@ func TestConcurrentGetOverflow(t *testing.T) {
 			defer wg.Done()
 
 			conn, err := pool.Get(ctx)
+
 			if err != nil {
+				fmt.Println("Err: ", err)
 				numErrors.Add(1)
 				return
 			}

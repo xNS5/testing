@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"grpc_client/pool/states"
-	"sync/atomic"
 
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 )
 
@@ -17,7 +17,7 @@ type Pool struct {
 	Mtx    sync.Mutex
 	Conns  []*Conn
 	Target string
-	Active atomic.Int64
+	sem    *semaphore.Weighted
 	Cfg    *PoolConfig
 }
 
@@ -39,7 +39,8 @@ func NewClient(pool *Pool) (*Conn, error) {
 	newConn := &Conn{
 		ID:         uuid.New(),
 		ClientConn: conn,
-		active_ref: &pool.Active,
+		ref:        pool,
+		sem:        semaphore.NewWeighted(int64(pool.Cfg.MaxReqPerConn)),
 		timeout:    pool.Cfg.ReqTimeout,
 	}
 
@@ -53,16 +54,19 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
+	fmt.Println("Initializing pool")
+
 	pool := &Pool{
 		Target: target,
 		Cfg:    cfg,
+		sem:    semaphore.NewWeighted(int64(cfg.Conns)),
 		Conns:  make([]*Conn, cfg.Conns),
 	}
 
 	for i := 0; i < cfg.Conns; i++ {
 		if conn, err := NewClient(pool); err == nil {
+			fmt.Println("Creating conn: ", conn.ID)
 			pool.Conns[i] = conn
-			fmt.Println("Spinning up: ", conn.ID)
 		} else {
 			return nil, err
 		}
@@ -73,27 +77,24 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
-	if int(p.Active.Load()) > (p.Cfg.MaxReqPerConn * len(p.Conns)) {
-		return nil, fmt.Errorf("pool at capacity")
-	}
+	for _, c := range p.Conns {
 
-	var best *Conn
+		if c.active.Load() >= int32(p.Cfg.MaxReqPerConn) {
+			continue
+		}
 
-	for i := range len(p.Conns) {
-		if c := p.Conns[i]; c.canAccept(p.Cfg.MaxReqPerConn) {
-			fmt.Println("Found best connection:", c.ID)
-			best = c
-			break
-		} else {
-			fmt.Println("connection at capacity:", c.ID)
+		if c.sem.TryAcquire(1) {
+			c.touch()
+			fmt.Println(c.ID)
+			return c, nil
 		}
 	}
 
-	if best == nil {
-		return nil, fmt.Errorf("pool at capacity")
-	}
+	return nil, fmt.Errorf("pool at capacity")
+}
 
-	return best, nil
+func (p *Pool) Release() {
+	p.sem.Release(1)
 }
 
 /*

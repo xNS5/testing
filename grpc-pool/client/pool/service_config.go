@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// Yes, this was thrown together with AI. Yes, I'm lazy.
+
 type ServiceConfig struct {
 	MethodConfig        []MethodConfig   `json:"methodConfig,omitempty"`
 	LoadBalancingConfig []map[string]any `json:"loadBalancingConfig,omitempty"`
