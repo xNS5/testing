@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"grpc_client/pool/states"
 
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +13,6 @@ import (
 )
 
 type Pool struct {
-	Mtx    sync.Mutex
 	Conns  []*Conn
 	Target string
 	sem    *semaphore.Weighted

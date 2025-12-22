@@ -11,44 +11,44 @@ import (
 // Yes, this was thrown together with AI. Yes, I'm lazy.
 
 type ServiceConfig struct {
-	MethodConfig        []MethodConfig   `json:"methodConfig,omitempty"`
-	LoadBalancingConfig []map[string]any `json:"loadBalancingConfig,omitempty"`
-	LoadBalancingPolicy string           `json:"loadBalancingPolicy,omitempty"` // deprecated but supported
-	RetryThrottling     *RetryThrottling `json:"retryThrottling,omitempty"`
+	MethodConfig        []MethodConfig   `json:"methodConfig,omitempty" yaml:"methodConfig,omitempty"`
+	LoadBalancingConfig []map[string]any `json:"loadBalancingConfig,omitempty" yaml:"loadBalancingConfig,omitempty"`
+	LoadBalancingPolicy string           `json:"loadBalancingPolicy,omitempty" yaml:"loadBalancingPolicy,omitempty"` // deprecated but supported
+	RetryThrottling     *RetryThrottling `json:"retryThrottling,omitempty" yaml:"retryThrottling,omitempty"`
 }
 
 type MethodConfig struct {
-	Name                    []Name         `json:"name"`
-	WaitForReady            *bool          `json:"waitForReady,omitempty"`
-	Timeout                 string         `json:"timeout,omitempty"`
-	MaxRequestMessageBytes  *int           `json:"maxRequestMessageBytes,omitempty"`
-	MaxResponseMessageBytes *int           `json:"maxResponseMessageBytes,omitempty"`
-	RetryPolicy             *RetryPolicy   `json:"retryPolicy,omitempty"`
-	HedgingPolicy           *HedgingPolicy `json:"hedgingPolicy,omitempty"`
+	Name                    []Name         `json:"name" yaml:"name"`
+	WaitForReady            *bool          `json:"waitForReady,omitempty" yaml:"waitForReady,omitempty"`
+	Timeout                 string         `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	MaxRequestMessageBytes  *int           `json:"maxRequestMessageBytes,omitempty" yaml:"maxRequestMessageBytes,omitempty"`
+	MaxResponseMessageBytes *int           `json:"maxResponseMessageBytes,omitempty" yaml:"maxResponseMessageBytes,omitempty"`
+	RetryPolicy             *RetryPolicy   `json:"retryPolicy,omitempty" yaml:"retryPolicy,omitempty"`
+	HedgingPolicy           *HedgingPolicy `json:"hedgingPolicy,omitempty" yaml:"hedgingPolicy,omitempty"`
 }
 
 type Name struct {
-	Service string `json:"service"`
-	Method  string `json:"method"`
+	Service string `json:"service" yaml:"service"`
+	Method  string `json:"method" yaml:"method"`
 }
 
 type RetryPolicy struct {
-	MaxAttempts          int      `json:"maxAttempts"`
-	InitialBackoff       string   `json:"initialBackoff"`
-	MaxBackoff           string   `json:"maxBackoff"`
-	BackoffMultiplier    float64  `json:"backoffMultiplier"`
-	RetryableStatusCodes []string `json:"retryableStatusCodes"`
+	MaxAttempts          int      `json:"maxAttempts" yaml:"maxAttempts"`
+	InitialBackoff       string   `json:"initialBackoff" yaml:"initialBackoff"`
+	MaxBackoff           string   `json:"maxBackoff" yaml:"maxBackoff"`
+	BackoffMultiplier    float64  `json:"backoffMultiplier" yaml:"backoffMultiplier"`
+	RetryableStatusCodes []string `json:"retryableStatusCodes" yaml:"retryableStatusCodes"`
 }
 
 type HedgingPolicy struct {
-	MaxAttempts         int      `json:"maxAttempts"`
-	HedgingDelay        string   `json:"hedgingDelay"`
-	NonFatalStatusCodes []string `json:"nonFatalStatusCodes"`
+	MaxAttempts         int      `json:"maxAttempts" yaml:"maxAttempts"`
+	HedgingDelay        string   `json:"hedgingDelay" yaml:"maxAttempts"`
+	NonFatalStatusCodes []string `json:"nonFatalStatusCodes" yaml:"nonFatalStatusCodes"`
 }
 
 type RetryThrottling struct {
-	MaxTokens  float64 `json:"maxTokens"`
-	TokenRatio float64 `json:"tokenRatio"`
+	MaxTokens  float64 `json:"maxTokens" yaml:"maxTokens"`
+	TokenRatio float64 `json:"tokenRatio" yaml:"tokenRatio"`
 }
 
 var validStatus = regexp.MustCompile(`^[A-Z_]+$`)
@@ -187,4 +187,9 @@ func FromJSON(data string) (*ServiceConfig, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+func FromFile(path string) (*ServiceConfig, error) {
+	
+	return nil, nil
 }

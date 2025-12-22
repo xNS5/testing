@@ -55,6 +55,8 @@ func TestConnection(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+
+
 /*
 TestTimeout
 Tests whether the RPC connection times out within the duration set in the pool
