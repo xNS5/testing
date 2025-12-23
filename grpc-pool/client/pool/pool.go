@@ -3,11 +3,9 @@ package pool
 import (
 	"context"
 	"fmt"
-	"grpc_client/pool/states"
 
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 )
@@ -24,27 +22,6 @@ type PoolConfig struct {
 	MaxReqPerConn int
 	Opts          []grpc.DialOption
 	ReqTimeout    time.Duration
-}
-
-func NewClient(pool *Pool) (*Conn, error) {
-	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
-
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	newConn := &Conn{
-		ID:         uuid.New(),
-		ClientConn: conn,
-		ref:        pool,
-		sem:        semaphore.NewWeighted(int64(pool.Cfg.MaxReqPerConn)),
-		timeout:    pool.Cfg.ReqTimeout,
-	}
-
-	newConn.state.Store(states.IDLE)
-
-	return newConn, err
 }
 
 func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
@@ -81,9 +58,8 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 			continue
 		}
 
-		if c.sem.TryAcquire(1) {
+		if c.TryAcquire() {
 			c.touch()
-			fmt.Println(c.ID)
 			return c, nil
 		}
 	}

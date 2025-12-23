@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"fmt"
 	"grpc_client/pool/states"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,31 @@ func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, o
 	}()
 
 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
+}
+
+func NewClient(pool *Pool) (*Conn, error) {
+	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	newConn := &Conn{
+		ID:         uuid.New(),
+		ClientConn: conn,
+		ref:        pool,
+		sem:        semaphore.NewWeighted(int64(pool.Cfg.MaxReqPerConn)),
+		timeout:    pool.Cfg.ReqTimeout,
+	}
+
+	newConn.state.Store(states.IDLE)
+
+	return newConn, err
+}
+
+func (c *Conn) TryAcquire() bool {
+	return c.sem.TryAcquire(1)
 }
 
 func (c *Conn) Release() {
