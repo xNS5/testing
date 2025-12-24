@@ -1,6 +1,9 @@
-package tests
+package pool
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func TotalRetryBackoff(maxAttempts int, initialBackoff, maxBackoff time.Duration, multiplier float64) time.Duration {
 	var total time.Duration
@@ -22,4 +25,19 @@ func pow(x, y float64) float64 {
 		result *= x
 	}
 	return result
+}
+
+func GetPool(config *PoolConfig) (*Pool, error) {
+
+	target := "localhost:5050"
+
+	fmt.Println("Initializing gRPC Pool")
+
+	pool, err := NewPool(target, config)
+
+	if err != nil {
+		fmt.Println("Error initializing grpc pool")
+	}
+
+	return pool, nil
 }

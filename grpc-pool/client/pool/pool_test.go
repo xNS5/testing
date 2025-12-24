@@ -1,9 +1,8 @@
-package tests
+package pool
 
 import (
 	"context"
 	"fmt"
-	"grpc_client/pool"
 	proto "grpc_client/protobuf"
 	"math"
 	"os"
@@ -25,7 +24,7 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts: []grpc.DialOption{
@@ -55,8 +54,6 @@ func TestConnection(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-
-
 /*
 TestTimeout
 Tests whether the RPC connection times out within the duration set in the pool
@@ -66,7 +63,7 @@ func TestTimeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -105,7 +102,7 @@ func TestConcurrentGet(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -167,7 +164,7 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&pool.PoolConfig{
+	pool, err := GetPool(&PoolConfig{
 		Conns:         3,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -219,11 +216,11 @@ func TestMethodConfig(t *testing.T) {
 
 	ctx := context.Background()
 
-	service_cfg := pool.ServiceConfig{
-		MethodConfig: []pool.MethodConfig{
+	service_cfg := ServiceConfig{
+		MethodConfig: []MethodConfig{
 			{
-				Name: []pool.Name{{}},
-				RetryPolicy: &pool.RetryPolicy{
+				Name: []Name{{}},
+				RetryPolicy: &RetryPolicy{
 					MaxAttempts:          4,
 					InitialBackoff:       "2s",
 					MaxBackoff:           "4s",
@@ -243,7 +240,7 @@ func TestMethodConfig(t *testing.T) {
 
 	target := "localhost:2020"
 
-	pool, err := pool.NewPool(target, (&pool.PoolConfig{
+	pool, err := NewPool(target, (&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts: []grpc.DialOption{
