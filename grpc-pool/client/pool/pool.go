@@ -3,6 +3,7 @@ package pool
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"time"
 
@@ -38,15 +39,29 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		Conns:  make([]*Conn, cfg.Conns),
 	}
 
+	errs := make(chan error)
+	var wg sync.WaitGroup
+
 	for i := 0; i < cfg.Conns; i++ {
-		if conn, err := NewClient(pool); err == nil {
-			fmt.Println("Creating conn: ", conn.ID)
+		wg.Add(1)
+		go func(i int){
+			if conn, err := NewClient(pool); err == nil {
+			fmt.Println("Creating conn: ", i, conn.ID)
 			pool.Conns[i] = conn
 		} else {
-			return nil, err
+			errs <- err
 		}
+		}(i)
 	}
 
+	wg.Wait()
+	close(errs)
+
+	if err := <- errs; err != nil {
+		pool.GracefulShutdown()
+		return nil, err
+	}
+	
 	return pool, nil
 }
 
@@ -73,7 +88,10 @@ func (p *Pool) Release() {
 
 func (p *Pool) GracefulShutdown() {
 	for _, conn := range p.Conns {
-		defer conn.Close()
+		if conn != nil {
+			conn.Close()
+			p.Release()
+		}
 	}
 }
 

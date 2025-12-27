@@ -25,22 +25,6 @@ type Conn struct {
 
 // const idleThreshold = time.Duration(30 * time.Second)
 
-/*
-CONNECTION LIFECYCLE
-*/
-func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-
-	c.state.Store(states.ALIVE)
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
-
-	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
-}
-
 func NewClient(pool *Pool) (*Conn, error) {
 	conn, err := grpc.NewClient(pool.Target, pool.Cfg.Opts...)
 
@@ -60,6 +44,22 @@ func NewClient(pool *Pool) (*Conn, error) {
 	newConn.state.Store(states.IDLE)
 
 	return newConn, err
+}
+
+/*
+CONNECTION LIFECYCLE
+*/
+func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
+
+	c.state.Store(states.ALIVE)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
+
+	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
 }
 
 func (c *Conn) TryAcquire() bool {
