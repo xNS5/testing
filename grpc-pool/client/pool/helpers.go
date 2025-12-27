@@ -9,10 +9,7 @@ func TotalRetryBackoff(maxAttempts int, initialBackoff, maxBackoff time.Duration
 	var total time.Duration
 
 	for i := 0; i < maxAttempts-1; i++ {
-		backoff := time.Duration(float64(initialBackoff) * pow(multiplier, float64(i)))
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
+		backoff := min(time.Duration(float64(initialBackoff)*pow(multiplier, float64(i))), maxBackoff)
 		total += backoff
 	}
 

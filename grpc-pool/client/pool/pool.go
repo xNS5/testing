@@ -71,6 +71,12 @@ func (p *Pool) Release() {
 	p.sem.Release(1)
 }
 
+func (p *Pool) GracefulShutdown() {
+	for _, conn := range p.Conns {
+		defer conn.Close()
+	}
+}
+
 /*
 INTERCEPTORS
 */
