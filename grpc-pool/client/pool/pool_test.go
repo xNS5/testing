@@ -34,15 +34,13 @@ func TestConnection(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Errorf("Error getting gRPC pool: %v", err)
-		os.Exit(-1)
+		t.Fatalf("Error getting gRPC pool: %v", err)
 	}
 
 	conn, err := pool.Get(ctx)
 
 	if err != nil {
-		t.Errorf("Error getting connection: %v", err)
-		os.Exit(-1)
+		t.Fatalf("Error getting connection: %v", err)
 	}
 
 	client := proto.NewHelloClient(conn)

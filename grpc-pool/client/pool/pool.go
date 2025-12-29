@@ -3,6 +3,7 @@ package pool
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	"time"
@@ -29,6 +30,7 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	if cfg.Conns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
+	
 
 	fmt.Println("Initializing pool")
 
@@ -39,25 +41,33 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		Conns:  make([]*Conn, cfg.Conns),
 	}
 
-	errs := make(chan error)
+
+	errs := make(chan error, cfg.Conns)
 	var wg sync.WaitGroup
+	
 
 	for i := 0; i < cfg.Conns; i++ {
 		wg.Add(1)
 		go func(i int){
-			if conn, err := NewClient(pool); err == nil {
-			fmt.Println("Creating conn: ", i, conn.ID)
-			pool.Conns[i] = conn
-		} else {
-			errs <- err
-		}
+			defer wg.Done()
+			if math.Mod(float64(i)+1, 2) == 0 {
+				errs <- fmt.Errorf("testing error")
+			} else if conn, err := NewClient(pool); err == nil {
+				fmt.Println("Creating conn: ", i, conn.ID)
+				pool.Conns[i] = conn
+			} else {
+				errs <- err
+			}
 		}(i)
 	}
 
 	wg.Wait()
 	close(errs)
 
+	fmt.Println("Returning...")
+
 	if err := <- errs; err != nil {
+		fmt.Println("Error detected, tearing down server: ", err)
 		pool.GracefulShutdown()
 		return nil, err
 	}
@@ -90,7 +100,6 @@ func (p *Pool) GracefulShutdown() {
 	for _, conn := range p.Conns {
 		if conn != nil {
 			conn.Close()
-			p.Release()
 		}
 	}
 }
