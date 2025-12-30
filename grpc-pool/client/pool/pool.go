@@ -2,9 +2,7 @@ package pool
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math"
 	"sync"
 
 	"time"
@@ -49,9 +47,8 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		
 		go func(i int) {
 			defer wg.Done()
-			if math.Mod(float64(i)+1, 2) == 0 {
-				errs <- errors.New("testing forced error return")
-			} else if conn, err := NewClient(pool); err == nil {
+			
+			 if conn, err := NewClient(pool); err == nil {
 				fmt.Println("Creating conn: ", i, conn.ID)
 				pool.Conns[i] = conn
 			} else {

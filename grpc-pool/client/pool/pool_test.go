@@ -31,7 +31,7 @@ func TestConnection(t *testing.T) {
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		},
 		ReqTimeout: time.Duration(20 * time.Second),
-	})
+	}, nil)
 
 	if err != nil {
 		t.Fatalf("Error getting gRPC pool: %v", err)
@@ -53,6 +53,43 @@ func TestConnection(t *testing.T) {
 }
 
 /*
+TestErrorConnection
+Tests that a valid error response from the server (in this case no connection) is handled properly and an error is returned
+*/
+
+func TestErrorConnection(t *testing.T) {
+
+	ctx := context.Background()
+
+	target := "localhost:5051"
+
+	pool, err := getPool(&PoolConfig{
+		Conns:         2,
+		MaxReqPerConn: 2,
+		Opts: []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		},
+		ReqTimeout: time.Duration(20 * time.Second),
+	}, &target)
+
+	if err != nil {
+		t.Fatalf("Error getting gRPC pool: %v", err)
+	}
+
+	conn, err := pool.Get(ctx)
+
+	if err != nil {
+		t.Fatalf("Error getting connection: %v", err)
+	}
+
+	client := proto.NewHelloClient(conn)
+
+	_, err = client.Hello(ctx, &proto.Request{})
+
+	assert.NotNil(t, err)
+}
+
+/*
 TestTimeout
 Tests whether the RPC connection times out within the duration set in the pool
 Note: Server should also time out, interrupting any blocking requests (in theory)
@@ -66,7 +103,7 @@ func TestTimeout(t *testing.T) {
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
-	})
+	}, nil)
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -105,7 +142,7 @@ func TestConcurrentGet(t *testing.T) {
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(2 * time.Second),
-	})
+	}, nil)
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)
@@ -167,7 +204,7 @@ func TestConcurrentGetOverflow(t *testing.T) {
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		ReqTimeout:    time.Duration(10 * time.Second),
-	})
+	}, nil)
 
 	if err != nil {
 		t.Errorf("Error getting gRPC pool: %v", err)

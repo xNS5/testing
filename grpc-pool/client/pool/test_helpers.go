@@ -24,9 +24,13 @@ func pow(x, y float64) float64 {
 	return result
 }
 
-func getPool(config *PoolConfig) (*Pool, error) {
+func getPool(config *PoolConfig, customTarget *string) (*Pool, error) {
 
 	target := "localhost:5050"
+
+	if customTarget != nil {
+		target = *customTarget
+	}
 
 	fmt.Println("Initializing gRPC Pool")
 
