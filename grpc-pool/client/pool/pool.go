@@ -7,6 +7,7 @@ import (
 
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -14,6 +15,8 @@ type Pool struct {
 	Conns  []*Conn
 	Target string
 	// sem    *semaphore.Weighted
+	logger Logger
+	logLevel LogLevel
 	Cfg *PoolConfig
 }
 
@@ -24,22 +27,34 @@ type PoolConfig struct {
 	ReqTimeout    time.Duration
 }
 
-func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
+func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) {
 	if cfg.Conns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
-
-	fmt.Println("Initializing pool")
 
 	pool := &Pool{
 		Target: target,
 		Cfg:    cfg,
 		/* // This is for later if I decide to make the pool scale dynamically
 		sem:    semaphore.NewWeighted(int64(cfg.Conns)), */
+		logger: NopLogger{},
+		logLevel: Debug,
 		Conns: make([]*Conn, cfg.Conns),
 	}
 
+	
+	
+	for _, opt := range opts {
+		opt(pool)
+	}
+	
+	if pool.logLevel == Debug {
+		pool.logger.Debug("Initializing pool")
+	}
+	
 	errs := make(chan error, cfg.Conns)
+	conn_ids := make(chan uuid.UUID, cfg.Conns)
+
 	var wg sync.WaitGroup
 	wg.Add(cfg.Conns)
 
@@ -47,7 +62,7 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 		go func(i int) {
 			defer wg.Done()
 			 if conn, err := NewClient(pool); err == nil {
-				fmt.Println("Creating conn: ", i, conn.ID)
+				conn_ids <- conn.ID
 				pool.Conns[i] = conn
 			} else {
 				errs <- err
@@ -57,11 +72,18 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 	wg.Wait()
 	close(errs)
+	close(conn_ids)
 
 	if err := <-errs; err != nil {
-		fmt.Println("Error detected, tearing down server: ", err)
+		pool.logger.Error("Error detected, tearing down server: ", err)
 		pool.GracefulShutdown()
 		return nil, err
+	}
+
+	if pool.logLevel == Info {
+		for id := range conn_ids {
+			pool.logger.Info("Creating connection: ", id)
+		}
 	}
 
 	return pool, nil
