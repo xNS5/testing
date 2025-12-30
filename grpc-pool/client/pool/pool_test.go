@@ -24,7 +24,7 @@ func TestConnection(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&PoolConfig{
+	pool, err := getPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts: []grpc.DialOption{
@@ -61,7 +61,7 @@ func TestTimeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&PoolConfig{
+	pool, err := getPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -100,7 +100,7 @@ func TestConcurrentGet(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&PoolConfig{
+	pool, err := getPool(&PoolConfig{
 		Conns:         2,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -162,7 +162,7 @@ func TestConcurrentGetOverflow(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool, err := GetPool(&PoolConfig{
+	pool, err := getPool(&PoolConfig{
 		Conns:         3,
 		MaxReqPerConn: 2,
 		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
@@ -269,7 +269,7 @@ func TestMethodConfig(t *testing.T) {
 	initial_backoff := time.Duration(int(retry_policy.InitialBackoff[0]) * time.Now().Second())
 	max_backoff := time.Duration(int(retry_policy.MaxBackoff[0]) * time.Now().Second())
 
-	estimated_duration := TotalRetryBackoff(max_attempts, time.Duration(initial_backoff), max_backoff, multiplier)
+	estimated_duration := totalRetryBackoff(max_attempts, time.Duration(initial_backoff), max_backoff, multiplier)
 
 	start := time.Now()
 

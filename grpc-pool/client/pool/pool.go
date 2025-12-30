@@ -8,15 +8,14 @@ import (
 
 	"time"
 
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 )
 
 type Pool struct {
 	Conns  []*Conn
 	Target string
-	sem    *semaphore.Weighted
-	Cfg    *PoolConfig
+	// sem    *semaphore.Weighted
+	Cfg *PoolConfig
 }
 
 type PoolConfig struct {
@@ -30,25 +29,23 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	if cfg.Conns < 1 {
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
-	
 
 	fmt.Println("Initializing pool")
 
 	pool := &Pool{
 		Target: target,
 		Cfg:    cfg,
-		sem:    semaphore.NewWeighted(int64(cfg.Conns)),
-		Conns:  make([]*Conn, cfg.Conns),
+		/* // This is for later if I decide to make the pool scale dynamically
+		sem:    semaphore.NewWeighted(int64(cfg.Conns)), */
+		Conns: make([]*Conn, cfg.Conns),
 	}
-
 
 	errs := make(chan error, cfg.Conns)
 	var wg sync.WaitGroup
-	
 
 	for i := 0; i < cfg.Conns; i++ {
 		wg.Add(1)
-		go func(i int){
+		go func(i int) {
 			defer wg.Done()
 			if math.Mod(float64(i)+1, 2) == 0 {
 				errs <- fmt.Errorf("testing error")
@@ -66,12 +63,12 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 	fmt.Println("Returning...")
 
-	if err := <- errs; err != nil {
+	if err := <-errs; err != nil {
 		fmt.Println("Error detected, tearing down server: ", err)
 		pool.GracefulShutdown()
 		return nil, err
 	}
-	
+
 	return pool, nil
 }
 
@@ -92,9 +89,9 @@ func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 	return nil, fmt.Errorf("pool at capacity")
 }
 
-func (p *Pool) Release() {
-	p.sem.Release(1)
-}
+// func (p *Pool) Release() {
+// 	p.sem.Release(1)
+// }
 
 func (p *Pool) GracefulShutdown() {
 	for _, conn := range p.Conns {

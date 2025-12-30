@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TotalRetryBackoff(maxAttempts int, initialBackoff, maxBackoff time.Duration, multiplier float64) time.Duration {
+func totalRetryBackoff(maxAttempts int, initialBackoff, maxBackoff time.Duration, multiplier float64) time.Duration {
 	var total time.Duration
 
 	for i := 0; i < maxAttempts-1; i++ {
@@ -24,7 +24,7 @@ func pow(x, y float64) float64 {
 	return result
 }
 
-func GetPool(config *PoolConfig) (*Pool, error) {
+func getPool(config *PoolConfig) (*Pool, error) {
 
 	target := "localhost:5050"
 
