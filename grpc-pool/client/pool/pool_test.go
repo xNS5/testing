@@ -43,9 +43,11 @@ func TestConnection(t *testing.T) {
 		t.Fatalf("Error getting connection: %v", err)
 	}
 
+	defer conn.Release()
+
+
 	client := proto.NewHelloClient(conn)
 
-	// var msg *string
 
 	_, err = client.Hello(ctx, &proto.Request{})
 
@@ -82,6 +84,9 @@ func TestErrorConnection(t *testing.T) {
 		t.Fatalf("Error getting connection: %v", err)
 	}
 
+	defer conn.Release()
+
+
 	client := proto.NewHelloClient(conn)
 
 	_, err = client.Hello(ctx, &proto.Request{})
@@ -106,16 +111,17 @@ func TestTimeout(t *testing.T) {
 	}, nil)
 
 	if err != nil {
-		t.Errorf("Error getting gRPC pool: %v", err)
-		os.Exit(-1)
+		t.Fatalf("Error getting gRPC pool: %v", err)
 	}
 
 	conn, err := pool.Get(ctx)
 
 	if err != nil {
-		t.Errorf("Error getting connection: %v", err)
-		os.Exit(-1)
+		t.Fatalf("Error getting connection: %v", err)
 	}
+
+	defer conn.Release()
+
 
 	client := proto.NewHelloClient(conn)
 
@@ -145,14 +151,14 @@ func TestConcurrentGet(t *testing.T) {
 	}, nil)
 
 	if err != nil {
-		t.Errorf("Error getting gRPC pool: %v", err)
-		os.Exit(-1)
+		t.Fatalf("Error getting gRPC pool: %v", err)
 	}
 
 	var wg sync.WaitGroup
 
 	reqs := 4
-	// In theory, 2 connections total
+
+	errs := make(chan error, reqs)
 
 	wg.Add(reqs)
 
@@ -160,12 +166,14 @@ func TestConcurrentGet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			conn, err := pool.Get(ctx)
-			defer conn.Release()
-
+		
 			if err != nil {
 				t.Errorf("Error getting connection: %v", err)
-				os.Exit(-1)
+				errs <- err
+				return
 			}
+
+			defer conn.Release()
 
 			client := proto.NewHelloClient(conn)
 
@@ -177,17 +185,29 @@ func TestConcurrentGet(t *testing.T) {
 
 			if err != nil {
 				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
+				errs <- err
+				return
 			}
 
 			if res.Res != msg {
 				t.Errorf("hello request error: %v", err)
-				os.Exit(-1)
+				errs <- err
+				return
 			}
 
 		}()
 	}
 	wg.Wait()
+	close(errs)
+
+	if len(errs) > 0 {
+		err := <- errs;
+		if err != nil {
+			t.Errorf("Error detected: %v", err)
+		}
+	}	
+
+	assert.Equal(t, len(errs), 0)
 }
 
 /*

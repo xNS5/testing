@@ -57,6 +57,7 @@ func (c *Conn) Invoke(ctx context.Context, method string, args any, reply any, o
 	go func() {
 		<-ctx.Done()
 		cancel()
+		c.Release()
 	}()
 
 	return c.ClientConn.Invoke(ctx, method, args, reply, opts...)
@@ -69,6 +70,7 @@ func (c *Conn) TryAcquire() bool {
 func (c *Conn) Release() {
 	if c.active.Load() > 0 {
 		c.active.Add(-1)
+		c.sem.Release(1)
 	} else {
 		c.state.Store(states.IDLE)
 	}

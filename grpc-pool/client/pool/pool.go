@@ -44,10 +44,8 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 	wg.Add(cfg.Conns)
 
 	for i := 0; i < cfg.Conns; i++ {
-		
 		go func(i int) {
 			defer wg.Done()
-			
 			 if conn, err := NewClient(pool); err == nil {
 				fmt.Println("Creating conn: ", i, conn.ID)
 				pool.Conns[i] = conn
@@ -72,10 +70,6 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	for _, c := range p.Conns {
-
-		if c.active.Load() >= int32(p.Cfg.MaxReqPerConn) {
-			continue
-		}
 
 		if c.TryAcquire() {
 			c.touch()
