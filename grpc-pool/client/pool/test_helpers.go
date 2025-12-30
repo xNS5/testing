@@ -36,5 +36,5 @@ func getPool(config *PoolConfig) (*Pool, error) {
 		fmt.Println("Error initializing grpc pool")
 	}
 
-	return pool, nil
+	return pool, err
 }

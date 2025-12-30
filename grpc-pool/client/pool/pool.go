@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -42,13 +43,14 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 	errs := make(chan error, cfg.Conns)
 	var wg sync.WaitGroup
+	wg.Add(cfg.Conns)
 
 	for i := 0; i < cfg.Conns; i++ {
-		wg.Add(1)
+		
 		go func(i int) {
 			defer wg.Done()
 			if math.Mod(float64(i)+1, 2) == 0 {
-				errs <- fmt.Errorf("testing error")
+				errs <- errors.New("testing forced error return")
 			} else if conn, err := NewClient(pool); err == nil {
 				fmt.Println("Creating conn: ", i, conn.ID)
 				pool.Conns[i] = conn
@@ -60,8 +62,6 @@ func NewPool(target string, cfg *PoolConfig) (*Pool, error) {
 
 	wg.Wait()
 	close(errs)
-
-	fmt.Println("Returning...")
 
 	if err := <-errs; err != nil {
 		fmt.Println("Error detected, tearing down server: ", err)
