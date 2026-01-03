@@ -15,9 +15,9 @@ type Pool struct {
 	Conns  []*Conn
 	Target string
 	// sem    *semaphore.Weighted
-	logger Logger
+	logger   Logger
 	logLevel LogLevel
-	Cfg *PoolConfig
+	Cfg      *PoolConfig
 }
 
 type PoolConfig struct {
@@ -29,6 +29,7 @@ type PoolConfig struct {
 
 func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) {
 	if cfg.Conns < 1 {
+
 		return nil, fmt.Errorf("maxConns must be greater than zero")
 	}
 
@@ -37,21 +38,19 @@ func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) 
 		Cfg:    cfg,
 		/* // This is for later if I decide to make the pool scale dynamically
 		sem:    semaphore.NewWeighted(int64(cfg.Conns)), */
-		logger: NopLogger{},
+		logger:   NopLogger{},
 		logLevel: Debug,
-		Conns: make([]*Conn, cfg.Conns),
+		Conns:    make([]*Conn, cfg.Conns),
 	}
 
-	
-	
 	for _, opt := range opts {
 		opt(pool)
 	}
-	
+
 	if pool.logLevel == Debug {
 		pool.logger.Debug("Initializing pool")
 	}
-	
+
 	errs := make(chan error, cfg.Conns)
 	conn_ids := make(chan uuid.UUID, cfg.Conns)
 
@@ -61,7 +60,7 @@ func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) 
 	for i := 0; i < cfg.Conns; i++ {
 		go func(i int) {
 			defer wg.Done()
-			 if conn, err := NewClient(pool); err == nil {
+			if conn, err := NewClient(pool); err == nil {
 				conn_ids <- conn.ID
 				pool.Conns[i] = conn
 			} else {
@@ -75,14 +74,14 @@ func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) 
 	close(conn_ids)
 
 	if err := <-errs; err != nil {
-		pool.logger.Error("Error detected, tearing down server: ", err)
+		pool.logger.Error(fmt.Sprint("Error detected, tearing down server: ", err))
 		pool.GracefulShutdown()
 		return nil, err
 	}
 
-	if pool.logLevel == Info {
+	if pool.logLevel >= Debug {
 		for id := range conn_ids {
-			pool.logger.Info("Creating connection: ", id)
+			pool.logger.Info(fmt.Sprint("Creating connection: ", id))
 		}
 	}
 
@@ -92,7 +91,6 @@ func NewPool(target string, cfg *PoolConfig, opts ...PoolOption) (*Pool, error) 
 func (p *Pool) Get(ctx context.Context) (*Conn, error) {
 
 	for _, c := range p.Conns {
-
 		if c.TryAcquire() {
 			c.touch()
 			return c, nil

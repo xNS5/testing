@@ -2,7 +2,11 @@ package pool
 
 import (
 	"fmt"
+	"math"
+	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func totalRetryBackoff(maxAttempts int, initialBackoff, maxBackoff time.Duration, multiplier float64) time.Duration {
@@ -24,7 +28,7 @@ func pow(x, y float64) float64 {
 	return result
 }
 
-func getPool(config *PoolConfig, customTarget *string) (*Pool, error) {
+func getPool(config *PoolConfig, customTarget *string, opts ...PoolOption) (*Pool, error) {
 
 	target := "localhost:5050"
 
@@ -41,4 +45,56 @@ func getPool(config *PoolConfig, customTarget *string) (*Pool, error) {
 	}
 
 	return pool, err
+}
+
+type ZeroLogger struct {
+	log zerolog.Logger
+}
+
+func addFields(e *zerolog.Event, kv ...any) {
+	if math.Mod(float64(len(kv)), 2) != 0 {
+		strs := make([]string, len(kv))
+		for i, v := range kv {
+			strs[i] = fmt.Sprint(v)
+		}
+		e.Interface("msg", strings.Join(strs, " "))
+	} else {
+		for i := 0; i+1 < len(kv); i += 2 {
+			key, ok := kv[i].(string)
+
+			if !ok {
+				continue
+			}
+			e.Interface(key, kv[i+1])
+		}
+	}
+
+}
+
+func NewZeroLogger(log zerolog.Logger) ZeroLogger {
+	return ZeroLogger{log: log}
+}
+
+func (z ZeroLogger) Debug(msg string, kv ...any) {
+	e := z.log.Debug()
+	addFields(e, kv...)
+	e.Msg(msg)
+}
+
+func (z ZeroLogger) Info(msg string, kv ...any) {
+	e := z.log.Info()
+	addFields(e, kv...)
+	e.Msg(msg)
+}
+
+func (z ZeroLogger) Warn(msg string, kv ...any) {
+	e := z.log.Warn()
+	addFields(e, kv...)
+	e.Msg(msg)
+}
+
+func (z ZeroLogger) Error(msg string, kv ...any) {
+	e := z.log.Error()
+	addFields(e, kv...)
+	e.Msg(msg)
 }

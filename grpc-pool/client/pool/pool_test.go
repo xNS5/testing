@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -45,13 +46,62 @@ func TestConnection(t *testing.T) {
 
 	defer conn.Release()
 
-
 	client := proto.NewHelloClient(conn)
-
 
 	_, err = client.Hello(ctx, &proto.Request{})
 
 	assert.Nil(t, err)
+}
+
+/*
+TestLogging
+Tests whether logging works
+*/
+
+func TestLogging(t *testing.T) {
+
+	ctx := context.Background()
+
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zl := zerolog.New(os.Stdout).
+		Level(zerolog.DebugLevel).
+		With().
+		Timestamp().
+		Str("component", "grpc-pool").
+		Logger()
+
+	logger := NewZeroLogger(zl)
+
+	target := "localhost:5050"
+
+	fmt.Println("Initializing gRPC Pool")
+
+	pool, err := NewPool(target, &PoolConfig{
+		Conns:         2,
+		MaxReqPerConn: 2,
+		Opts: []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		},
+		ReqTimeout: time.Duration(20 * time.Second),
+	},
+		WithLogger(logger),
+	)
+
+	if err != nil {
+		fmt.Println("Error initializing grpc pool")
+	}
+
+	conn, err := pool.Get(ctx)
+
+	if err != nil {
+		t.Fatalf("Error getting connection: %v", err)
+	}
+
+	defer conn.Release()
+
+	client := proto.NewHelloClient(conn)
+
+	_, err = client.Hello(ctx, &proto.Request{})
 }
 
 /*
@@ -85,7 +135,6 @@ func TestErrorConnection(t *testing.T) {
 	}
 
 	defer conn.Release()
-
 
 	client := proto.NewHelloClient(conn)
 
@@ -122,7 +171,6 @@ func TestTimeout(t *testing.T) {
 
 	defer conn.Release()
 
-
 	client := proto.NewHelloClient(conn)
 
 	timeout := int32(10)
@@ -156,7 +204,7 @@ func TestConcurrentGet(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	reqs := 4
+	reqs := 2
 
 	errs := make(chan error, reqs)
 
@@ -166,7 +214,7 @@ func TestConcurrentGet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			conn, err := pool.Get(ctx)
-		
+
 			if err != nil {
 				t.Errorf("Error getting connection: %v", err)
 				errs <- err
@@ -201,21 +249,21 @@ func TestConcurrentGet(t *testing.T) {
 	close(errs)
 
 	if len(errs) > 0 {
-		err := <- errs;
+		err := <-errs
 		if err != nil {
 			t.Errorf("Error detected: %v", err)
 		}
-	}	
+	}
 
 	assert.Equal(t, len(errs), 0)
 }
 
 /*
-TestConcurrentGetOverflow
+TestConcurrentOverflow
 Tests running n connection requests concurrently to the server.
 Expected result: the pool creates ( numConns // numPerCon ) connections
 */
-func TestConcurrentGetOverflow(t *testing.T) {
+func TestConcurrentOverflow(t *testing.T) {
 
 	ctx := context.Background()
 

@@ -78,6 +78,8 @@ func (c *Conn) Release() {
 
 func (c *Conn) touch() {
 	c.active.Add(1)
-	c.state.Store(states.ALIVE)
+	if c.state.Load() != states.ALIVE {
+		c.state.Store(states.ALIVE)
+	}
 	c.last_used.Store(time.Now().Unix())
 }
