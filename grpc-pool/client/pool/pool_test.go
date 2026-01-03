@@ -3,11 +3,10 @@ package pool
 import (
 	"context"
 	"fmt"
-	proto "grpc_client/protobuf"
+	proto "grpc_client/pool/test_protobuf"
 	"math"
 	"os"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -259,6 +258,135 @@ func TestConcurrentGet(t *testing.T) {
 }
 
 /*
+	TestSequentialConcurrentGet
+
+This tests the behavior of the pool after doing 1 sequence of concurrent get requests to the server
+*/
+func TestSequentialConcurrentGet(t *testing.T) {
+
+	ctx := context.Background()
+
+	pool, err := getPool(&PoolConfig{
+		Conns:         2,
+		MaxReqPerConn: 2,
+		Opts:          []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		ReqTimeout:    time.Duration(2 * time.Second),
+	}, nil)
+
+	if err != nil {
+		t.Fatalf("Error getting gRPC pool: %v", err)
+	}
+
+	var wg sync.WaitGroup
+
+	reqs := 2
+
+	errs := make(chan error, reqs)
+
+	wg.Add(reqs)
+
+	for i := range reqs {
+		go func() {
+			defer wg.Done()
+			conn, err := pool.Get(ctx)
+
+			if err != nil {
+				t.Errorf("Error getting connection: %v", err)
+				errs <- err
+				return
+			}
+
+			defer conn.Release()
+
+			client := proto.NewHelloClient(conn)
+
+			msg := fmt.Sprintf("Test New Conn %v", i)
+
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg: &msg,
+			})
+
+			if err != nil {
+				t.Errorf("hello request error: %v", err)
+				errs <- err
+				return
+			}
+
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				errs <- err
+				return
+			}
+
+		}()
+	}
+
+	wg.Wait()
+
+	// if len(errs) > 0 {
+	// 	err := <-errs
+	// 	if err != nil {
+	// 		t.Errorf("Error detected: %v", err)
+	// 	}
+	// }
+
+	// Assert first execution has no errors
+	assert.Equal(t, len(errs), 0)
+
+	errs = make(chan error)
+
+	wg.Add(reqs)
+
+	for i := range reqs {
+		go func() {
+			defer wg.Done()
+			conn, err := pool.Get(ctx)
+
+			if err != nil {
+				t.Errorf("Error getting connection: %v", err)
+				errs <- err
+				return
+			}
+
+			defer conn.Release()
+
+			client := proto.NewHelloClient(conn)
+
+			msg := fmt.Sprintf("Test New Conn %v", i)
+
+			res, err := client.Hello(ctx, &proto.Request{
+				Msg: &msg,
+			})
+
+			if err != nil {
+				t.Errorf("hello request error: %v", err)
+				errs <- err
+				return
+			}
+
+			if res.Res != msg {
+				t.Errorf("hello request error: %v", err)
+				errs <- err
+				return
+			}
+
+		}()
+	}
+
+	wg.Wait()
+
+	// if len(errs) > 0 {
+	// 	err := <-errs
+	// 	if err != nil {
+	// 		t.Errorf("Error detected: %v", err)
+	// 	}
+	// }
+
+	// Assert first execution has no errors
+	assert.Equal(t, len(errs), 0)
+}
+
+/*
 TestConcurrentOverflow
 Tests running n connection requests concurrently to the server.
 Expected result: the pool creates ( numConns // numPerCon ) connections
@@ -280,11 +408,11 @@ func TestConcurrentOverflow(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-
 	reqs := 8
-	wg.Add(reqs)
 
-	var numErrors atomic.Int32
+	errs := make(chan error, reqs)
+
+	wg.Add(reqs)
 
 	timeout := int32(5)
 
@@ -295,8 +423,8 @@ func TestConcurrentOverflow(t *testing.T) {
 			conn, err := pool.Get(ctx)
 
 			if err != nil {
-				fmt.Println("Err: ", err)
-				numErrors.Add(1)
+				t.Errorf("hello request error: %v", err)
+				errs <- err
 				return
 			}
 
@@ -309,8 +437,9 @@ func TestConcurrentOverflow(t *testing.T) {
 	}
 
 	wg.Wait()
+	close(errs)
 
-	assert.Equal(t, int(math.Abs(float64((pool.Cfg.MaxReqPerConn*pool.Cfg.Conns)-reqs))), int(numErrors.Load()))
+	assert.Equal(t, int(math.Abs(float64((pool.Cfg.MaxReqPerConn*pool.Cfg.Conns)-reqs))), len(errs))
 }
 
 // TestConfig
